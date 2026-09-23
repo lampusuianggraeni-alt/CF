@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Expense, ExpenseCategory } from '../types';
 import { PlusCircle, Search, Trash2, FileText, ShoppingBag, Calendar, Tag, Image as ImageIcon, Upload, ArrowDownRight, Edit3, X, CheckCircle2, Coins, Sparkles, AlertTriangle, Eye, ChevronDown, ChevronUp } from 'lucide-react';
@@ -57,6 +57,19 @@ export const ExpensesManager: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('semua');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (viewingReceipt) setViewingReceipt(null);
+        else if (deletingExpense) setDeletingExpense(null);
+        else if (editingExpense) setEditingExpense(null);
+        else if (showAddModal) setShowAddModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewingReceipt, deletingExpense, editingExpense, showAddModal]);
 
   // Add Form state
   const [amount, setAmount] = useState<number>(100000);
@@ -499,7 +512,12 @@ export const ExpensesManager: React.FC = () => {
 
       {/* Add Expense Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAddModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto"
+        >
           <form
             onSubmit={handleAdd}
             className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-8 relative border border-slate-100 space-y-4 my-8"
@@ -722,7 +740,12 @@ export const ExpensesManager: React.FC = () => {
 
       {/* Edit Expense Modal */}
       {editingExpense && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setEditingExpense(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto"
+        >
           <form
             onSubmit={handleUpdate}
             className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-8 relative border border-slate-100 space-y-4 my-8"
@@ -924,7 +947,12 @@ export const ExpensesManager: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {deletingExpense && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDeletingExpense(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+        >
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-7 relative border border-slate-100 space-y-4">
             <div className="flex items-start space-x-3.5">
               <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl shrink-0">
@@ -1000,7 +1028,12 @@ export const ExpensesManager: React.FC = () => {
 
       {/* Receipt Full View Modal */}
       {viewingReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setViewingReceipt(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm"
+        >
           <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 relative border border-slate-100 space-y-4 animate-scale-in">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div>

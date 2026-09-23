@@ -1,28 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { PaymentMethod } from '../types';
-import { X, QrCode, Building2, Wallet, CheckCircle2, Upload, AlertCircle, ArrowRight, ShieldCheck, Download, Copy, Check, Calendar, CheckSquare, Sparkles } from 'lucide-react';
+import { X, QrCode, Building2, Wallet, CheckCircle2, Upload, AlertCircle, ArrowRight, ShieldCheck, Download, Copy, Check, Calendar, CheckSquare, Sparkles, Coins } from 'lucide-react';
+
+export type PaymentDurationOption = 'nominal_1000' | '1_minggu' | '2_minggu' | '3_minggu' | '1_bulan' | 'custom';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  defaultOption?: PaymentDurationOption;
+  defaultAmount?: number;
 }
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onSuccess }) => {
+export const PaymentModal: React.FC<PaymentModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  defaultOption = 'nominal_1000',
+  defaultAmount = 1000,
+}) => {
   const { currentUser, classGroup, addPayment } = useApp();
 
   const [step, setStep] = useState<'amount' | 'method' | 'process' | 'success'>('amount');
   const [selectedMonth, setSelectedMonth] = useState<string>(classGroup.period);
-  const [paymentOption, setPaymentOption] = useState<'1_minggu' | '2_minggu' | '3_minggu' | '1_bulan' | 'custom'>('1_bulan');
+  const [paymentOption, setPaymentOption] = useState<PaymentDurationOption>(defaultOption);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
-  const [customAmount, setCustomAmount] = useState<number>(classGroup.weeklyDues);
+  const [customAmount, setCustomAmount] = useState<number>(defaultAmount);
   const [method, setMethod] = useState<PaymentMethod>('qris');
   const [proofUrl, setProofUrl] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [lastTxn, setLastTxn] = useState<any>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (defaultOption) {
+        setPaymentOption(defaultOption);
+      }
+      if (defaultAmount) {
+        setCustomAmount(defaultAmount);
+      }
+      setStep('amount');
+    }
+  }, [isOpen, defaultOption, defaultAmount]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -31,6 +63,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
 
   const getComputedAmount = () => {
     switch (paymentOption) {
+      case 'nominal_1000':
+        return 1000;
       case '1_minggu':
         return weeklyFee;
       case '2_minggu':
@@ -42,12 +76,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
       case 'custom':
         return customAmount;
       default:
-        return monthlyFee;
+        return 1000;
     }
   };
 
   const getWeekPeriodLabel = () => {
     switch (paymentOption) {
+      case 'nominal_1000':
+        return `Cicilan Kas Rp 1.000 (Minggu ${selectedWeek})`;
       case '1_minggu':
         return `Minggu ${selectedWeek}`;
       case '2_minggu':
@@ -57,9 +93,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
       case '1_bulan':
         return '1 Bulan Penuh (Minggu 1 - 4)';
       case 'custom':
-        return `Pembayaran Kas Khusus`;
+        return `Pembayaran Kas Khusus Rp ${customAmount.toLocaleString('id-ID')}`;
       default:
-        return '1 Bulan Penuh';
+        return 'Cicilan Kas Rp 1.000';
     }
   };
 
@@ -87,7 +123,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
         date: new Date().toISOString().split('T')[0],
         monthPeriod: selectedMonth,
         weekPeriod: getWeekPeriodLabel(),
-        weeksPaid: paymentOption === '1_minggu' ? [selectedWeek] : paymentOption === '1_bulan' ? [1, 2, 3, 4] : [1, 2],
+        weeksPaid: (paymentOption === 'nominal_1000' || paymentOption === '1_minggu') ? [selectedWeek] : paymentOption === '1_bulan' ? [1, 2, 3, 4] : [1, 2],
         method,
         status: isAutoLunas ? 'lunas' : 'menunggu',
         proofUrl: proofUrl || (method === 'transfer_bank' ? 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=500' : undefined),
@@ -98,12 +134,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
 
       setLastTxn(newTxn);
       setStep('success');
-      onSuccess();
+      setIsProcessing(false);
     }, 1000);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto"
+    >
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-8 relative border border-slate-100 my-8">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
@@ -139,13 +180,43 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
               </select>
             </div>
 
-            {/* Pilihan Paket Minggu */}
+            {/* Pilihan Paket / Nominal Pembayaran */}
             <div className="space-y-2">
               <label className="block text-xs font-black text-slate-700 uppercase tracking-widest">
-                Pilih Durasi Pembayaran:
+                Pilih Nominal / Durasi Pembayaran:
               </label>
+
+              {/* Opsi Unggulan Kas Rp 1.000 */}
+              <button
+                type="button"
+                onClick={() => setPaymentOption('nominal_1000')}
+                className={`w-full p-4 rounded-2xl border text-left transition-all relative flex items-center justify-between cursor-pointer ${
+                  paymentOption === 'nominal_1000'
+                    ? 'border-amber-500 bg-amber-50/80 shadow-sm ring-2 ring-amber-400/30'
+                    : 'border-amber-200 bg-amber-50/40 hover:bg-amber-50'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs">
+                    <Coins className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Bayar Kas Rp 1.000</p>
+                      <span className="px-2 py-0.5 bg-amber-200 text-amber-900 rounded-full text-[9px] font-black uppercase tracking-wider">
+                        Paling Ringan
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 font-medium">Cicilan kas harian / setor receh santai</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-black text-amber-700">Rp 1.000</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Sekali Bayar</p>
+                </div>
+              </button>
               
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
                 {/* 1 Minggu */}
                 <button
                   type="button"
@@ -211,11 +282,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
               </div>
             </div>
 
-            {/* If 1 Minggu is chosen, choose which week */}
-            {paymentOption === '1_minggu' && (
+            {/* If 1 Minggu or Cicil Rp 1.000 is chosen, choose which week */}
+            {(paymentOption === '1_minggu' || paymentOption === 'nominal_1000') && (
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
                 <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider">
-                  Pilih Minggu yang Hendak Dibayar:
+                  {paymentOption === 'nominal_1000' ? 'Pilih Minggu untuk Cicilan Rp 1.000:' : 'Pilih Minggu yang Hendak Dibayar:'}
                 </label>
                 <div className="grid grid-cols-4 gap-2">
                   {[1, 2, 3, 4].map((wk) => (
@@ -538,10 +609,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onS
             </div>
 
             <button
-              onClick={onClose}
+              onClick={() => {
+                onClose();
+                onSuccess();
+              }}
               className="w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-md transition-all cursor-pointer"
             >
-              TUTUP & KEMBALI KE BERANDA
+              TUTUP & LIHAT RIWAYAT SAYA
             </button>
           </div>
         )}

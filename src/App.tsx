@@ -2,21 +2,45 @@ import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { HeaderNav } from './components/HeaderNav';
 import { MemberDashboard } from './components/MemberDashboard';
-import { PaymentModal } from './components/PaymentModal';
+import { PaymentModal, PaymentDurationOption } from './components/PaymentModal';
 import { PaymentHistoryView } from './components/PaymentHistoryView';
 import { TreasurerDashboard } from './components/TreasurerDashboard';
 import { ExpensesManager } from './components/ExpensesManager';
 import { FinancialReportView } from './components/FinancialReportView';
 import { AdminDashboard } from './components/AdminDashboard';
 import { MemberQrModal } from './components/MemberQrModal';
+import { UserProfileModal } from './components/UserProfileModal';
 import { AccessDeniedBanner } from './components/AccessDeniedBanner';
-import { Home, CreditCard, History, FileText, PlusCircle, Settings, QrCode } from 'lucide-react';
+import { LoginScreen } from './components/LoginScreen';
+import { Home, CreditCard, History, FileText, PlusCircle, Settings, QrCode, Coins, User } from 'lucide-react';
 
 function AppContent() {
-  const { currentUser } = useApp();
+  const { currentUser, isAuthenticated } = useApp();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isPayModalOpen, setIsPayModalOpen] = useState<boolean>(false);
+  const [payModalOption, setPayModalOption] = useState<PaymentDurationOption>('nominal_1000');
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    if (activeTab === 'bayar_1000') {
+      setPayModalOption('nominal_1000');
+      setIsPayModalOpen(true);
+      setActiveTab('dashboard');
+    } else if (activeTab === 'bayar') {
+      setPayModalOption('1_minggu');
+      setIsPayModalOpen(true);
+      setActiveTab('dashboard');
+    } else if (activeTab === 'profil') {
+      setIsProfileModalOpen(true);
+      setActiveTab('dashboard');
+    }
+  }, [activeTab]);
+
+  // If not authenticated, render Login Screen
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
 
   const isTreasurerOrAdmin = currentUser.role === 'bendahara' || currentUser.role === 'admin';
   const isAdmin = currentUser.role === 'admin';
@@ -28,6 +52,10 @@ function AppContent() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onOpenQrModal={() => setIsQrModalOpen(true)}
+        onOpenPayModal={(opt = 'nominal_1000') => {
+          setPayModalOption(opt);
+          setIsPayModalOpen(true);
+        }}
       />
 
       {/* Main Container */}
@@ -40,21 +68,14 @@ function AppContent() {
             <AdminDashboard />
           ) : (
             <MemberDashboard
-              onOpenPayModal={() => setIsPayModalOpen(true)}
+              onOpenPayModal={(opt = 'nominal_1000') => {
+                setPayModalOption(opt);
+                setIsPayModalOpen(true);
+              }}
               setActiveTab={setActiveTab}
               onOpenQrModal={() => setIsQrModalOpen(true)}
             />
           )
-        )}
-
-        {activeTab === 'bayar' && (
-          <div className="max-w-2xl mx-auto py-8">
-            <PaymentModal
-              isOpen={true}
-              onClose={() => setActiveTab('dashboard')}
-              onSuccess={() => setActiveTab('riwayat')}
-            />
-          </div>
         )}
 
         {activeTab === 'riwayat' && <PaymentHistoryView />}
@@ -89,6 +110,7 @@ function AppContent() {
       {/* Global Modals */}
       <PaymentModal
         isOpen={isPayModalOpen}
+        defaultOption={payModalOption}
         onClose={() => setIsPayModalOpen(false)}
         onSuccess={() => {
           setIsPayModalOpen(false);
@@ -116,10 +138,26 @@ function AppContent() {
         {currentUser.role === 'anggota' && (
           <>
             <button
-              onClick={() => setIsPayModalOpen(true)}
-              className="flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider text-[#2563EB]"
+              onClick={() => {
+                setPayModalOption('nominal_1000');
+                setIsPayModalOpen(true);
+              }}
+              className="flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider text-amber-600 cursor-pointer"
             >
-              <div className="p-2.5 bg-[#2563EB] text-white rounded-full shadow-lg -mt-5 border-2 border-white">
+              <div className="p-2 bg-amber-400 text-slate-950 rounded-full shadow-md">
+                <Coins className="w-4 h-4" />
+              </div>
+              <span>Rp 1.000</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setPayModalOption('1_minggu');
+                setIsPayModalOpen(true);
+              }}
+              className="flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider text-[#2563EB] cursor-pointer"
+            >
+              <div className="p-2.5 bg-[#2563EB] text-white rounded-full shadow-lg -mt-4 border-2 border-white">
                 <CreditCard className="w-5 h-5" />
               </div>
               <span>Bayar</span>
@@ -146,7 +184,7 @@ function AppContent() {
               }`}
             >
               <CreditCard className="w-5 h-5" />
-              <span>Kas Class</span>
+              <span>Kas Siswa</span>
             </button>
 
             <button
@@ -170,7 +208,28 @@ function AppContent() {
           <FileText className="w-5 h-5" />
           <span>Laporan</span>
         </button>
+
+        {/* Profil Mobile Bottom Button */}
+        <button
+          onClick={() => setIsProfileModalOpen(true)}
+          className="flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-[#2563EB] cursor-pointer"
+        >
+          <div className="w-5 h-5 rounded-full overflow-hidden border border-slate-300">
+            <img 
+              src={currentUser.avatar} 
+              alt="Profil" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <span>Profil</span>
+        </button>
       </div>
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
     </div>
   );
 }

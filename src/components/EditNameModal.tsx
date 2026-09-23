@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { User } from '../types';
-import { X, UserCheck, Edit3, Check, AlertCircle, Sparkles } from 'lucide-react';
+import { Role, User } from '../types';
+import { X, UserCheck, Edit3, Check, AlertCircle, Shield } from 'lucide-react';
 
 interface EditNameModalProps {
   user: User | null;
@@ -10,18 +10,30 @@ interface EditNameModalProps {
 }
 
 export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onClose }) => {
-  const { updateUser } = useApp();
+  const { updateUser, currentUser } = useApp();
   const [name, setName] = useState('');
+  const [role, setRole] = useState<Role>('anggota');
   const [error, setError] = useState('');
   const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     if (user) {
       setName(user.name);
+      setRole(user.role);
       setError('');
       setIsSaved(false);
     }
   }, [user, isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !user) return null;
 
@@ -44,7 +56,10 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
       return;
     }
 
-    updateUser(user.id, { name: trimmed });
+    updateUser(user.id, {
+      name: trimmed,
+      ...(currentUser.role === 'admin' ? { role } : {}),
+    });
     setIsSaved(true);
 
     setTimeout(() => {
@@ -54,7 +69,12 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"
+    >
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col">
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-[#2563EB] to-blue-700 p-5 text-white flex items-center justify-between">
@@ -138,6 +158,25 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
             <p className="text-[11px] text-slate-400 font-medium">
               Nama ini akan tampil di seluruh kuitansi, riwayat kas, dan daftar kelas.
             </p>
+
+            {currentUser.role === 'admin' && (
+              <div className="space-y-1.5 pt-3 border-t border-slate-100">
+                <label htmlFor="user-role-select" className="block text-xs font-black text-slate-700 uppercase tracking-wider flex items-center space-x-1">
+                  <Shield className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Peran / Role Pengguna (Khusus Admin)</span>
+                </label>
+                <select
+                  id="user-role-select"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as Role)}
+                  className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50/50 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+                >
+                  <option value="anggota">Anggota Kelas</option>
+                  <option value="bendahara">Bendahara Kelas</option>
+                  <option value="admin">Administrator</option>
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}

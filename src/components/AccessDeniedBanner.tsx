@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, ArrowLeft, RefreshCw, Lock } from 'lucide-react';
+import { Lock, ArrowLeft, LogOut } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 interface AccessDeniedProps {
@@ -8,7 +8,7 @@ interface AccessDeniedProps {
 }
 
 export const AccessDeniedBanner: React.FC<AccessDeniedProps> = ({ requiredRole, setActiveTab }) => {
-  const { switchRole, currentUser } = useApp();
+  const { currentUser, logout } = useApp();
 
   return (
     <div className="max-w-2xl mx-auto my-12 p-8 rounded-3xl bg-white border border-rose-200 shadow-xl text-center space-y-6">
@@ -28,13 +28,6 @@ export const AccessDeniedBanner: React.FC<AccessDeniedProps> = ({ requiredRole, 
         </p>
       </div>
 
-      <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs text-blue-900 text-left space-y-1">
-        <p className="font-bold">💡 Uji Coba Mode Simulator:</p>
-        <p className="text-blue-700">
-          Anda dapat berpindah role menggunakan tombol simulator di bar bagian atas atau klik tombol di bawah untuk beralih peran:
-        </p>
-      </div>
-
       <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
         <button
           onClick={() => setActiveTab('dashboard')}
@@ -45,11 +38,11 @@ export const AccessDeniedBanner: React.FC<AccessDeniedProps> = ({ requiredRole, 
         </button>
 
         <button
-          onClick={() => switchRole('bendahara')}
-          className="px-6 py-3 rounded-2xl bg-[#2563EB] hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-blue-200 flex items-center space-x-2 transition-all cursor-pointer"
+          onClick={logout}
+          className="px-6 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-rose-200 flex items-center space-x-2 transition-all cursor-pointer"
         >
-          <RefreshCw className="w-4 h-4" />
-          <span>Ganti ke Akun Bendahara</span>
+          <LogOut className="w-4 h-4" />
+          <span>Login Akun Lain</span>
         </button>
       </div>
     </div>

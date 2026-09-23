@@ -19,13 +19,21 @@ export type ExpenseCategory =
 export interface User {
   id: string;
   name: string;
-  email: string;
+  username: string; // Identifier login yang dibuat oleh admin (contoh: "admin", "bendahara", "anggota01")
+  password?: string; // Kata sandi login yang dibuat/disediakan admin (contoh: "admin123", "bendahara123", "kas12345")
+  nisn?: string; // Nomor Induk Siswa Nasional / ID Anggota
+  email: string; // Email akun
+  googleEmail?: string; // Email Google resmi (e.g. @gmail.com) untuk akses aplikasi
+  hasCustomPassword?: boolean; // Apakah anggota sudah mengatur kata sandi sendiri
   phone: string;
   role: Role;
   avatar: string;
   classId: string;
   className: string;
   memberQrCode: string;
+  status?: 'aktif' | 'nonaktif';
+  createdAt?: string;
+  createdBy?: string;
 }
 
 export interface ClassGroup {

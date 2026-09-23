@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Payment } from '../types';
 import { X, CheckCircle2, XCircle, ShieldCheck, AlertCircle, Eye } from 'lucide-react';
@@ -13,13 +13,28 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({ payment, o
   const [notes, setNotes] = useState('');
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const handleAction = (status: 'lunas' | 'belum_bayar') => {
     verifyPayment(payment.id, status, notes);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+    >
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-8 relative border border-slate-100 space-y-5">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>

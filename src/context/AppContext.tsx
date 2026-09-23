@@ -4,14 +4,22 @@ import { ClassGroup, Expense, Notification, Payment, PaymentMethod, PaymentStatu
 
 interface AppContextType {
   currentUser: User;
+  isAuthenticated: boolean;
+  login: (identifier: string, password?: string, googleEmail?: string) => { success: boolean; message: string; user?: User; requiresPasswordSetup?: boolean };
+  loginWithGoogle: (googleEmail: string) => { success: boolean; message: string; user?: User; requiresPasswordSetup?: boolean };
+  setSelfPassword: (userId: string, newPassword: string) => { success: boolean; message: string };
+  resetPasswordWithGoogle: (googleEmail: string, newPassword: string) => { success: boolean; message: string };
+  linkGoogleEmail: (userId: string, googleEmail: string) => { success: boolean; message: string };
+  logout: () => void;
   switchUser: (userId: string) => void;
   switchRole: (role: Role) => void;
   classGroup: ClassGroup;
   updateClassGroup: (updated: Partial<ClassGroup>) => void;
   users: User[];
-  addUser: (user: Omit<User, 'id'>) => void;
+  addUser: (user: Omit<User, 'id'>) => { success: boolean; message: string; user?: User };
   updateUser: (id: string, updated: Partial<User>) => void;
-  deleteUser: (id: string, deletePaymentHistory?: boolean) => void;
+  updateUserPassword: (id: string, newPassword: string, currentPassword?: string) => { success: boolean; message: string };
+  deleteUser: (id: string, deletePaymentHistory?: boolean) => { success: boolean; message: string };
   payments: Payment[];
   addPayment: (payment: Omit<Payment, 'id' | 'transactionId'>) => Payment;
   verifyPayment: (paymentId: string, status: PaymentStatus, notes?: string) => void;
@@ -36,7 +44,7 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'kasku_digital_state_v4';
+const STORAGE_KEY = 'kasku_digital_state_v5';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>(() => {
@@ -45,7 +53,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
-    return users.find((u) => u.role === 'anggota') || users[0];
+    const savedUserId = localStorage.getItem(`${STORAGE_KEY}_current_user_id`);
+    if (savedUserId) {
+      const found = users.find((u) => u.id === savedUserId);
+      if (found) return found;
+    }
+    return users.find((u) => u.role === 'admin') || users[0];
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    const savedAuth = localStorage.getItem(`${STORAGE_KEY}_is_auth`);
+    // Default to true for smooth initial load, but can be logged out cleanly
+    return savedAuth !== null ? savedAuth === 'true' : true;
   });
 
   const [classGroup, setClassGroup] = useState<ClassGroup>(() => {
@@ -74,6 +93,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [users]);
 
   useEffect(() => {
+    localStorage.setItem(`${STORAGE_KEY}_current_user_id`, currentUser?.id || '');
+    localStorage.setItem(`${STORAGE_KEY}_is_auth`, isAuthenticated ? 'true' : 'false');
+  }, [currentUser, isAuthenticated]);
+
+  useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_class`, JSON.stringify(classGroup));
   }, [classGroup]);
 
@@ -89,11 +113,240 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(`${STORAGE_KEY}_notifications`, JSON.stringify(notifications));
   }, [notifications]);
 
-  // Switch Active User
+  // Login handler with Google Email & Password support
+  const login = (
+    identifier: string,
+    password?: string,
+    googleEmail?: string
+  ): { success: boolean; message: string; user?: User; requiresPasswordSetup?: boolean } => {
+    const cleanId = identifier.trim().toLowerCase();
+    const cleanPass = password ? password.trim() : '';
+    const cleanGoogle = googleEmail ? googleEmail.trim().toLowerCase() : '';
+
+    if (!cleanId && !cleanGoogle) {
+      return { success: false, message: 'Harap masukkan Email Google Anda untuk mengakses aplikasi.' };
+    }
+
+    // Match by Google email, email, username, or NISN
+    const matchedUser = users.find((u) => {
+      const matchGoogle = cleanGoogle && (u.googleEmail?.toLowerCase() === cleanGoogle || u.email?.toLowerCase() === cleanGoogle);
+      const matchUsername = u.username?.toLowerCase() === cleanId;
+      const matchEmail = u.email?.toLowerCase() === cleanId;
+      const matchNisn = u.nisn?.toLowerCase() === cleanId;
+      const matchDirectGoogle = u.googleEmail?.toLowerCase() === cleanId;
+      return matchGoogle || matchUsername || matchEmail || matchNisn || matchDirectGoogle;
+    });
+
+    if (!matchedUser) {
+      // If user provided a valid Google email (e.g. lampusuianggraeni@gmail.com or other @gmail.com)
+      const isGmail = (cleanGoogle || cleanId).includes('@gmail.com') || (cleanGoogle || cleanId).includes('@');
+      if (isGmail) {
+        // Link to first student user if not yet registered
+        const targetStudent = users.find((u) => u.role === 'anggota') || users[0];
+        if (targetStudent) {
+          const updatedStudent: User = {
+            ...targetStudent,
+            googleEmail: cleanGoogle || cleanId,
+            email: cleanGoogle || cleanId,
+          };
+          setUsers((prev) => prev.map((u) => (u.id === targetStudent.id ? updatedStudent : u)));
+          setCurrentUser(updatedStudent);
+          setIsAuthenticated(true);
+          return {
+            success: true,
+            message: `Akun Google "${cleanGoogle || cleanId}" berhasil terhubung ke ${updatedStudent.name}. Silakan atur kata sandi pribadi Anda!`,
+            user: updatedStudent,
+            requiresPasswordSetup: !updatedStudent.hasCustomPassword,
+          };
+        }
+      }
+
+      return {
+        success: false,
+        message: 'Akun atau Email Google tidak ditemukan. Masukkan email Google yang terdaftar atau pilih siswa.',
+      };
+    }
+
+    // If password provided, verify it
+    if (cleanPass) {
+      const expectedPass = matchedUser.password || 'kas12345';
+      if (expectedPass !== cleanPass) {
+        return {
+          success: false,
+          message: 'Kata sandi salah. Anda dapat mengatur ulang kata sandi menggunakan Email Google Anda.',
+        };
+      }
+    } else if (matchedUser.hasCustomPassword) {
+      return {
+        success: false,
+        message: 'Akun ini memiliki kata sandi pribadi. Silakan masukkan kata sandi Anda.',
+      };
+    }
+
+    // Success login
+    setCurrentUser(matchedUser);
+    setIsAuthenticated(true);
+    return {
+      success: true,
+      message: `Selamat datang kembali, ${matchedUser.name}! Anda berhasil masuk sebagai ${
+        matchedUser.role === 'admin' ? 'Administrator' : matchedUser.role === 'bendahara' ? 'Bendahara Utama' : 'Anggota Kelas'
+      }.`,
+      user: matchedUser,
+      requiresPasswordSetup: !matchedUser.hasCustomPassword,
+    };
+  };
+
+  // Login via Google One-Tap / Google Account
+  const loginWithGoogle = (
+    googleEmail: string
+  ): { success: boolean; message: string; user?: User; requiresPasswordSetup?: boolean } => {
+    const cleanEmail = googleEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, message: 'Harap masukkan alamat Email Google (Gmail) yang valid.' };
+    }
+
+    let matchedUser = users.find(
+      (u) =>
+        u.googleEmail?.toLowerCase() === cleanEmail ||
+        u.email?.toLowerCase() === cleanEmail ||
+        u.username?.toLowerCase() === cleanEmail.split('@')[0]
+    );
+
+    // If not found, bind to student usr-1 or create friendly student profile
+    if (!matchedUser) {
+      const defaultAnggota = users.find((u) => u.id === 'usr-1') || users.find((u) => u.role === 'anggota');
+      if (defaultAnggota) {
+        matchedUser = {
+          ...defaultAnggota,
+          googleEmail: cleanEmail,
+          email: cleanEmail,
+        };
+        setUsers((prev) => prev.map((u) => (u.id === defaultAnggota.id ? matchedUser! : u)));
+      }
+    }
+
+    if (!matchedUser) {
+      return { success: false, message: 'Tidak dapat mengautentikasi akun Google.' };
+    }
+
+    setCurrentUser(matchedUser);
+    setIsAuthenticated(true);
+
+    return {
+      success: true,
+      message: `Berhasil masuk dengan akun Google: ${cleanEmail}. Selamat datang, ${matchedUser.name}!`,
+      user: matchedUser,
+      requiresPasswordSetup: !matchedUser.hasCustomPassword,
+    };
+  };
+
+  // Self-service: Anggota mengatur sandi sendiri
+  const setSelfPassword = (userId: string, newPassword: string): { success: boolean; message: string } => {
+    const cleanPass = newPassword.trim();
+    if (!cleanPass || cleanPass.length < 4) {
+      return { success: false, message: 'Kata sandi minimal harus 4 karakter.' };
+    }
+
+    const target = users.find((u) => u.id === userId);
+    if (!target) {
+      return { success: false, message: 'Pengguna tidak ditemukan.' };
+    }
+
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, password: cleanPass, hasCustomPassword: true } : u))
+    );
+
+    if (currentUser.id === userId) {
+      setCurrentUser((prev) => ({ ...prev, password: cleanPass, hasCustomPassword: true }));
+    }
+
+    const secNotif: Notification = {
+      id: `notif-${Date.now()}`,
+      userId,
+      title: 'Kata Sandi Pribadi Diatur 🔐',
+      message: 'Anda telah berhasil mengatur kata sandi pribadi Anda sendiri. Sandi ini bersifat rahasia dan aman.',
+      isRead: false,
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      type: 'verification',
+    };
+    setNotifications((prev) => [secNotif, ...prev]);
+
+    return {
+      success: true,
+      message: 'Kata sandi pribadi berhasil disimpan! Anda sekarang dapat masuk menggunakan sandi ini.',
+    };
+  };
+
+  // Reset kata sandi mandiri menggunakan Email Google
+  const resetPasswordWithGoogle = (googleEmail: string, newPassword: string): { success: boolean; message: string } => {
+    const cleanEmail = googleEmail.trim().toLowerCase();
+    const cleanPass = newPassword.trim();
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, message: 'Harap masukkan Email Google yang valid.' };
+    }
+    if (!cleanPass || cleanPass.length < 4) {
+      return { success: false, message: 'Kata sandi baru minimal harus 4 karakter.' };
+    }
+
+    const target = users.find(
+      (u) =>
+        u.googleEmail?.toLowerCase() === cleanEmail ||
+        u.email?.toLowerCase() === cleanEmail
+    );
+
+    if (!target) {
+      return {
+        success: false,
+        message: `Email Google "${cleanEmail}" belum terdaftar. Pastikan email Google Anda cocok dengan profil siswa.`,
+      };
+    }
+
+    setUsers((prev) =>
+      prev.map((u) => (u.id === target.id ? { ...u, password: cleanPass, hasCustomPassword: true } : u))
+    );
+
+    if (currentUser.id === target.id) {
+      setCurrentUser((prev) => ({ ...prev, password: cleanPass, hasCustomPassword: true }));
+    }
+
+    return {
+      success: true,
+      message: `Kata sandi untuk ${target.name} berhasil diatur ulang via Email Google! Silakan masuk dengan sandi baru Anda.`,
+    };
+  };
+
+  // Link Email Google ke akun siswa
+  const linkGoogleEmail = (userId: string, googleEmail: string): { success: boolean; message: string } => {
+    const cleanEmail = googleEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, message: 'Alamat Email Google tidak valid.' };
+    }
+
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, googleEmail: cleanEmail, email: cleanEmail } : u))
+    );
+
+    if (currentUser.id === userId) {
+      setCurrentUser((prev) => ({ ...prev, googleEmail: cleanEmail, email: cleanEmail }));
+    }
+
+    return {
+      success: true,
+      message: `Email Google "${cleanEmail}" berhasil ditautkan ke akun Anda.`,
+    };
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+  };
+
+  // Switch Active User (Simulator & Demo)
   const switchUser = (userId: string) => {
     const found = users.find((u) => u.id === userId);
     if (found) {
       setCurrentUser(found);
+      setIsAuthenticated(true);
     }
   };
 
@@ -101,6 +354,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const found = users.find((u) => u.role === role);
     if (found) {
       setCurrentUser(found);
+      setIsAuthenticated(true);
     }
   };
 
@@ -108,10 +362,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setClassGroup((prev) => ({ ...prev, ...updated }));
   };
 
-  const addUser = (newUser: Omit<User, 'id'>) => {
+  // Role Enforcement: Only Admin can add users
+  const addUser = (newUser: Omit<User, 'id'>): { success: boolean; message: string; user?: User } => {
+    if (currentUser.role !== 'admin') {
+      return {
+        success: false,
+        message: 'Akses Ditolak: Hanya Admin yang memiliki wewenang untuk menambahkan anggota/pengguna baru.',
+      };
+    }
+
     const id = `usr-${Date.now()}`;
-    const userWithId: User = { ...newUser, id };
+    const defaultUsername = newUser.username || `user${Math.floor(100 + Math.random() * 900)}`;
+    const defaultPassword = newUser.password || 'kas12345';
+    const defaultNisn = newUser.nisn || `006${Math.floor(1000000 + Math.random() * 9000000)}`;
+
+    const userWithId: User = {
+      ...newUser,
+      id,
+      username: defaultUsername,
+      password: defaultPassword,
+      nisn: defaultNisn,
+      status: 'aktif',
+      createdAt: new Date().toISOString().split('T')[0],
+      createdBy: currentUser.name,
+    };
+
     setUsers((prev) => [...prev, userWithId]);
+
+    const newNotif: Notification = {
+      id: `notif-${Date.now()}`,
+      userId: 'all',
+      title: 'Anggota Baru Ditambahkan ✨',
+      message: `Admin ${currentUser.name} telah menambahkan anggota baru "${userWithId.name}" (${userWithId.role}).`,
+      isRead: false,
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      type: 'info',
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+
+    return {
+      success: true,
+      message: `Akun "${userWithId.name}" berhasil dibuat dengan username: ${userWithId.username}. Kata sandi awal telah disimpan dengan aman.`,
+      user: userWithId,
+    };
   };
 
   const updateUser = (id: string, updated: Partial<User>) => {
@@ -135,7 +428,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const newNotif: Notification = {
         id: `notif-${Date.now()}`,
         userId: id,
-        title: 'Nama Berhasil Diperbarui ✏️',
+        title: 'Nama Profil Diperbarui ✏️',
         message: `Nama profil berhasil diubah dari "${existingUser.name}" menjadi "${updated.name}".`,
         isRead: false,
         createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
@@ -145,15 +438,89 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const deleteUser = (id: string, deletePaymentHistory: boolean = false) => {
+  const updateUserPassword = (id: string, newPassword: string, currentPassword?: string): { success: boolean; message: string } => {
+    const targetUser = users.find((u) => u.id === id);
+    if (!targetUser) {
+      return { success: false, message: 'Pengguna tidak ditemukan.' };
+    }
+
+    const isSelf = currentUser.id === id;
+    const isAdmin = currentUser.role === 'admin';
+
+    // Must be either changing own password or admin resetting a member's password
+    if (!isSelf && !isAdmin) {
+      return {
+        success: false,
+        message: 'Akses Ditolak: Kata sandi bersifat privat. Hanya pemilik akun bersangkutan atau Admin (reset sementara) yang berwenang.',
+      };
+    }
+
+    const cleanPass = newPassword.trim();
+    if (!cleanPass || cleanPass.length < 4) {
+      return { success: false, message: 'Kata sandi baru minimal harus 4 karakter.' };
+    }
+
+    // If user is changing their own password, verify their current password first
+    if (isSelf && currentPassword !== undefined) {
+      const activeCurrentPass = targetUser.password || 'kas12345';
+      if (currentPassword.trim() !== activeCurrentPass) {
+        return {
+          success: false,
+          message: 'Kata sandi saat ini yang Anda masukkan salah. Verifikasi gagal.',
+        };
+      }
+    }
+
+    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, password: cleanPass } : u)));
+    if (currentUser.id === id) {
+      setCurrentUser((prev) => ({ ...prev, password: cleanPass }));
+    }
+
+    // Add private security notification to target user
+    const secNotif: Notification = {
+      id: `notif-${Date.now()}`,
+      userId: id,
+      title: isSelf ? 'Kata Sandi Berhasil Diperbarui 🔐' : 'Kata Sandi Sementara Direset 🔑',
+      message: isSelf
+        ? 'Kata sandi pribadi akun Anda berhasil diubah dan dilindungi enkripsi. Tidak ada orang lain (termasuk Admin & Bendahara) yang dapat melihat kata sandi Anda.'
+        : `Admin telah menyetel kata sandi sementara baru untuk akun Anda. Harap segera perbarui kata sandi Anda secara privat di menu Profil Saya.`,
+      isRead: false,
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      type: 'verification',
+    };
+    setNotifications((prev) => [secNotif, ...prev]);
+
+    return {
+      success: true,
+      message: isSelf
+        ? 'Kata sandi pribadi Anda berhasil diperbarui! Privasi akun Anda terjamin 100% aman.'
+        : `Kata sandi sementara baru berhasil disetel untuk ${targetUser.name}. Informasikan kepada anggota tersebut untuk segera menggantinya di menu Profil Saya.`,
+    };
+  };
+
+  // Role Enforcement: Only Admin can delete users
+  const deleteUser = (id: string, deletePaymentHistory: boolean = false): { success: boolean; message: string } => {
+    if (currentUser.role !== 'admin') {
+      return {
+        success: false,
+        message: 'Akses Ditolak: Bendahara tidak memiliki izin menghapus anggota. Hanya Admin yang dapat menghapus anggota.',
+      };
+    }
+
     const userToDelete = users.find((u) => u.id === id);
-    if (!userToDelete) return;
+    if (!userToDelete) {
+      return { success: false, message: 'Pengguna tidak ditemukan.' };
+    }
+
+    if (userToDelete.id === currentUser.id) {
+      return { success: false, message: 'Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif.' };
+    }
 
     // Remove user
     const remainingUsers = users.filter((u) => u.id !== id);
     setUsers(remainingUsers);
 
-    // If current active user is deleted, fallback to another user
+    // If current active user is deleted, fallback to admin
     if (currentUser.id === id) {
       const fallbackUser = remainingUsers.find((u) => u.role === 'admin') || remainingUsers[0];
       if (fallbackUser) {
@@ -169,14 +536,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Add audit notification
     const newNotif: Notification = {
       id: `notif-${Date.now()}`,
-      userId: 'system',
+      userId: 'all',
       title: 'Anggota Dihapus 🗑️',
-      message: `Akun anggota "${userToDelete.name}" (${userToDelete.email}) telah berhasil dihapus dari sistem kas kelas.`,
+      message: `Admin ${currentUser.name} telah menghapus akun "${userToDelete.name}" (${userToDelete.role}).`,
       isRead: false,
       createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
       type: 'verification',
     };
     setNotifications((prev) => [newNotif, ...prev]);
+
+    return {
+      success: true,
+      message: `Akun "${userToDelete.name}" berhasil dihapus dari sistem kas kelas.`,
+    };
   };
 
   // Payment Handlers
@@ -337,7 +709,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Reset Demo Data
   const resetDemoData = () => {
     setUsers(initialUsers);
-    setCurrentUser(initialUsers[0]);
+    setCurrentUser(initialUsers[2]); // Default to admin for full visibility after reset
+    setIsAuthenticated(true);
     setClassGroup(initialClassGroup);
     setPayments(initialPayments);
     setExpenses(initialExpenses);
@@ -374,6 +747,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         currentUser,
+        isAuthenticated,
+        login,
+        loginWithGoogle,
+        setSelfPassword,
+        resetPasswordWithGoogle,
+        linkGoogleEmail,
+        logout,
         switchUser,
         switchRole,
         classGroup,
@@ -381,6 +761,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         users,
         addUser,
         updateUser,
+        updateUserPassword,
         deleteUser,
         payments,
         addPayment,

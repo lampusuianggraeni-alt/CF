@@ -1,24 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Role } from '../types';
-import { Bell, CheckCircle, ShieldCheck, UserCheck, Users, QrCode, RefreshCw, Sparkles, ChevronDown, ShieldAlert, Info, Camera, Edit3 } from 'lucide-react';
+import { Bell, CheckCircle, ShieldCheck, UserCheck, Users, QrCode, RefreshCw, Sparkles, ChevronDown, ShieldAlert, Info, Camera, Edit3, LogOut, KeyRound, Coins } from 'lucide-react';
 import { RolePermissionModal } from './RolePermissionModal';
 import { ProfilePhotoModal } from './ProfilePhotoModal';
 import { EditNameModal } from './EditNameModal';
+import { UserProfileModal } from './UserProfileModal';
+import { SelfPasswordModal } from './SelfPasswordModal';
+import { PaymentDurationOption } from './PaymentModal';
 
 interface HeaderNavProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   onOpenQrModal: () => void;
+  onOpenPayModal?: (option: PaymentDurationOption) => void;
 }
 
-export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, onOpenQrModal }) => {
-  const { currentUser, switchRole, switchUser, users, notifications, markNotificationRead, markAllNotificationsRead, resetDemoData, classGroup } = useApp();
+export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, onOpenQrModal, onOpenPayModal }) => {
+  const { currentUser, switchRole, switchUser, users, notifications, markNotificationRead, markAllNotificationsRead, resetDemoData, classGroup, logout } = useApp();
   const [showNotificationsPopover, setShowNotificationsPopover] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [showProfilePhotoModal, setShowProfilePhotoModal] = useState(false);
   const [showEditNameModal, setShowEditNameModal] = useState(false);
+  const [showUserProfileModal, setShowUserProfileModal] = useState(false);
+  const [showSelfPasswordModal, setShowSelfPasswordModal] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowNotificationsPopover(false);
+        setShowUserDropdown(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const myNotifications = notifications.filter(
     (n) => n.userId === currentUser.id || n.userId === 'all'
@@ -27,58 +44,54 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
   const memberCount = users.filter((u) => u.role === 'anggota').length;
 
   const roleColors: Record<Role, { bg: string; border: string; label: string; badge: string }> = {
-    anggota: { bg: 'bg-emerald-50 text-emerald-700', border: 'border-emerald-200', label: `👦 Anggota (${memberCount} Orang)`, badge: 'bg-emerald-600' },
-    bendahara: { bg: 'bg-blue-50 text-blue-700', border: 'border-blue-200', label: '👩‍💼 Bendahara', badge: 'bg-[#2563EB]' },
-    admin: { bg: 'bg-purple-50 text-purple-700', border: 'border-purple-200', label: '⚙️ Admin', badge: 'bg-purple-600' },
+    anggota: { bg: 'bg-emerald-50 text-emerald-700', border: 'border-emerald-200', label: `👦 Anggota (${memberCount})`, badge: 'bg-emerald-600' },
+    bendahara: { bg: 'bg-blue-50 text-blue-700', border: 'border-blue-200', label: '💼 Bendahara', badge: 'bg-[#2563EB]' },
+    admin: { bg: 'bg-purple-50 text-purple-700', border: 'border-purple-200', label: '👑 Admin', badge: 'bg-purple-600' },
   };
 
   return (
     <>
       <header className="sticky top-0 z-30 bg-[#2563EB] text-white shadow-lg">
-        {/* Demo Switcher Bar Top */}
+        {/* Top Info Bar (Role & Class Portal) */}
         <div className="bg-[#1E293B] text-slate-200 px-4 py-1.5 text-xs flex flex-wrap items-center justify-between gap-2 border-b border-white/10">
           <div className="flex items-center space-x-2">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#2563EB] text-white font-black text-[10px] tracking-wider uppercase">
-              SIMULATOR HAK AKSES
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-white font-black text-[10px] tracking-wider uppercase ${
+                currentUser.role === 'admin'
+                  ? 'bg-purple-600'
+                  : currentUser.role === 'bendahara'
+                  ? 'bg-[#2563EB]'
+                  : 'bg-emerald-600'
+              }`}
+            >
+              {currentUser.role === 'admin'
+                ? 'PORTAL ADMINISTRATOR KELAS'
+                : currentUser.role === 'bendahara'
+                ? 'PORTAL BENDAHARA KELAS'
+                : 'PORTAL ANGGOTA KELAS'}
             </span>
-            <span className="text-slate-300 font-bold text-[11px] hidden sm:inline uppercase tracking-wider">Pilih Role:</span>
+            <span className="text-slate-300 font-bold text-[11px] hidden sm:inline uppercase tracking-wider">
+              {currentUser.name} • {classGroup.name}
+            </span>
           </div>
 
-          <div className="flex items-center space-x-1.5 overflow-x-auto">
-            {(['anggota', 'bendahara', 'admin'] as Role[]).map((r) => {
-              const isActive = currentUser.role === r;
-              return (
-                <button
-                  key={r}
-                  onClick={() => switchRole(r)}
-                  className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center space-x-1 uppercase tracking-wider cursor-pointer ${
-                    isActive
-                      ? 'bg-[#2563EB] text-white shadow-sm ring-2 ring-white/30 font-black'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                  }`}
-                >
-                  <span>{roleColors[r].label}</span>
-                  {isActive && <CheckCircle className="w-3.5 h-3.5 text-green-400" />}
-                </button>
-              );
-            })}
-
+          <div className="flex items-center space-x-1.5">
             <button
               onClick={() => setShowPermissionModal(true)}
-              className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 font-bold text-[11px] uppercase tracking-wider flex items-center space-x-1 border border-amber-400/30 cursor-pointer ml-1"
-              title="Lihat Perbedaan Hak Akses Bendahara & Anggota"
+              className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 font-bold text-[11px] uppercase tracking-wider flex items-center space-x-1 border border-amber-400/30 cursor-pointer"
+              title="Lihat Perbedaan Hak Akses Role"
             >
               <Info className="w-3 h-3" />
               <span>Info Hak Akses</span>
             </button>
 
             <button
-              onClick={resetDemoData}
-              title="Reset ke Data Standar"
-              className="ml-1 text-slate-400 hover:text-amber-300 transition-colors p-1 flex items-center space-x-1 text-[11px] font-bold uppercase tracking-wider cursor-pointer"
+              onClick={logout}
+              title="Keluar ke Halaman Login"
+              className="ml-1 px-2.5 py-1 rounded-full bg-rose-900/80 hover:bg-rose-800 text-rose-200 font-bold text-[11px] uppercase tracking-wider flex items-center space-x-1 border border-rose-500/30 cursor-pointer"
             >
-              <RefreshCw className="w-3 h-3" />
-              <span className="hidden md:inline">Reset</span>
+              <LogOut className="w-3 h-3" />
+              <span>Logout</span>
             </button>
           </div>
         </div>
@@ -113,13 +126,41 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                   : 'text-white/90 hover:bg-white/10'
               }`}
             >
-              {currentUser.role === 'bendahara' ? 'Dashboard Bendahara' : currentUser.role === 'admin' ? 'Dashboard Admin' : 'Beranda Saya'}
+              {currentUser.role === 'admin'
+                ? 'Dashboard Admin'
+                : currentUser.role === 'bendahara'
+                ? 'Dashboard Bendahara'
+                : 'Beranda Anggota'}
             </button>
 
             {currentUser.role === 'anggota' && (
               <>
                 <button
-                  onClick={() => setActiveTab('bayar')}
+                  onClick={() => {
+                    if (onOpenPayModal) {
+                      onOpenPayModal('nominal_1000');
+                    } else {
+                      setActiveTab('bayar_1000');
+                    }
+                  }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center space-x-1.5 ${
+                    activeTab === 'bayar_1000'
+                      ? 'bg-amber-400 text-slate-950 shadow-md ring-2 ring-white/30'
+                      : 'bg-amber-400/25 text-amber-200 hover:bg-amber-400/40 hover:text-white border border-amber-300/40'
+                  }`}
+                  title="Bayar Kas Rp 1.000 (Cicil Kas Ringan / Harian)"
+                >
+                  <Coins className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Bayar Kas Rp 1.000</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (onOpenPayModal) {
+                      onOpenPayModal('1_minggu');
+                    } else {
+                      setActiveTab('bayar');
+                    }
+                  }}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                     activeTab === 'bayar'
                       ? 'bg-white text-[#2563EB] shadow-md'
@@ -161,7 +202,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                       : 'text-white/90 hover:bg-white/10'
                   }`}
                 >
-                  Catat Pengeluaran
+                  Kelola Pengeluaran Kas
                 </button>
               </>
             )}
@@ -174,7 +215,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                   : 'text-white/90 hover:bg-white/10'
               }`}
             >
-              Laporan Keuangan
+              Laporan Kas
             </button>
 
             {currentUser.role === 'admin' && (
@@ -191,8 +232,29 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
             )}
           </nav>
 
+          {/* Backdrop to close popovers/dropdowns on outside click */}
+          {(showNotificationsPopover || showUserDropdown) && (
+            <div
+              className="fixed inset-0 z-40 bg-transparent cursor-default"
+              onClick={() => {
+                setShowNotificationsPopover(false);
+                setShowUserDropdown(false);
+              }}
+            />
+          )}
+
           {/* Right Actions: QR Code, Notifications, Profile */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 relative z-50">
+            {/* Profil Saya Quick Button */}
+            <button
+              onClick={() => setShowUserProfileModal(true)}
+              className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-black uppercase tracking-wider border border-white/20 transition-all cursor-pointer shadow-xs"
+              title="Kelola Foto Profil, Username Akun, & Kontak"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-amber-300" />
+              <span>Profil Saya</span>
+            </button>
+
             {/* Member QR Code Button */}
             <button
               onClick={onOpenQrModal}
@@ -311,9 +373,35 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                       </div>
                       <div>
                         <p className="font-black text-slate-900 text-sm">{currentUser.name}</p>
-                        <p className="text-slate-500 text-[11px] font-medium">{currentUser.email}</p>
+                        <p className="text-slate-500 text-[11px] font-medium font-mono">@{currentUser.username}</p>
                       </div>
                     </div>
+
+                    {/* Primary Profile Action */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        setShowUserProfileModal(true);
+                      }}
+                      className="w-full py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/20"
+                    >
+                      <UserCheck className="w-3.5 h-3.5 text-amber-300" />
+                      <span>⚙️ Pengaturan Profil & Akun</span>
+                    </button>
+
+                    {/* Self Password Management Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        setShowSelfPasswordModal(true);
+                      }}
+                      className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-emerald-300"
+                    >
+                      <KeyRound className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>🔐 Atur & Ubah Sandi Pribadi</span>
+                    </button>
 
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -332,11 +420,11 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                         type="button"
                         onClick={() => {
                           setShowUserDropdown(false);
-                          setShowProfilePhotoModal(true);
+                          setShowUserProfileModal(true);
                         }}
-                        className="w-full py-2 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1 transition-colors cursor-pointer shadow-xs"
+                        className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1 transition-colors cursor-pointer border border-slate-200"
                       >
-                        <Camera className="w-3.5 h-3.5" />
+                        <Camera className="w-3.5 h-3.5 text-blue-600" />
                         <span>Ubah Foto</span>
                       </button>
                     </div>
@@ -355,34 +443,19 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                         Cek Hak Akses
                       </button>
                     </div>
-                  </div>
 
-                  <div className="px-2 py-1 text-[10px] uppercase tracking-widest font-black text-slate-400">
-                    Pilih Akun Demo (Total {users.length} Akun):
-                  </div>
-
-                  <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
-                    {users.map((u) => (
-                      <button
-                        key={u.id}
-                        onClick={() => {
-                          switchUser(u.id);
-                          setShowUserDropdown(false);
-                        }}
-                        className={`w-full flex items-center space-x-2 px-3 py-2 rounded-xl text-left transition-colors cursor-pointer ${
-                          u.id === currentUser.id
-                            ? 'bg-blue-50 text-[#2563EB] font-black shadow-xs'
-                            : 'hover:bg-slate-100 text-slate-700'
-                        }`}
-                      >
-                        <img src={u.avatar} alt={u.name} className="w-7 h-7 rounded-full object-cover" />
-                        <div className="flex-1 truncate">
-                          <p className="truncate font-bold">{u.name}</p>
-                          <p className="text-[10px] text-slate-400 uppercase font-bold">{u.role}</p>
-                        </div>
-                        {u.id === currentUser.id && <CheckCircle className="w-4 h-4 text-[#2563EB]" />}
-                      </button>
-                    ))}
+                    {/* Logout Button in User Dropdown */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        logout();
+                      }}
+                      className="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-rose-200/80 mt-1"
+                    >
+                      <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Keluar (Halaman Login)</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -390,6 +463,11 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
           </div>
         </div>
       </header>
+
+      <UserProfileModal
+        isOpen={showUserProfileModal}
+        onClose={() => setShowUserProfileModal(false)}
+      />
 
       <RolePermissionModal
         isOpen={showPermissionModal}
@@ -405,6 +483,11 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
         user={currentUser}
         isOpen={showEditNameModal}
         onClose={() => setShowEditNameModal(false)}
+      />
+
+      <SelfPasswordModal
+        isOpen={showSelfPasswordModal}
+        onClose={() => setShowSelfPasswordModal(false)}
       />
     </>
   );

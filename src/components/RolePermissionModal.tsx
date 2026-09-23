@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShieldCheck, UserCheck, ShieldAlert, X, Check, Lock } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { ShieldCheck, UserCheck, ShieldAlert, X, Check, Lock, KeyRound, Users, Shield } from 'lucide-react';
 
 interface RolePermissionModalProps {
   isOpen: boolean;
@@ -7,123 +7,182 @@ interface RolePermissionModalProps {
 }
 
 export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({ isOpen, onClose }) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full p-6 sm:p-8 relative border border-slate-100 my-8">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto"
+    >
+      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full p-6 sm:p-8 relative border border-slate-100 my-8">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 bg-blue-100 text-[#2563EB] rounded-2xl">
+            <div className="p-2.5 bg-blue-100 text-[#2563EB] rounded-2xl">
               <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
               <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">
-                Hak Akses & Peran (RBAC)
+                Struktur 3 Role Pengguna & Hak Akses
               </h2>
               <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-                Pembagian Wewenang Bendahara vs Anggota Class Fund
+                Admin • Bendahara • Anggota (Class Fund)
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+            className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
-          {/* ANGGOTA */}
-          <div className="p-5 rounded-3xl bg-emerald-50/60 border border-emerald-200 space-y-3">
-            <div className="flex items-center space-x-2">
-              <span className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-black uppercase tracking-wider">
-                👦 Anggota Kelas (32 Anggota)
-              </span>
-            </div>
-            <p className="text-xs text-emerald-950 font-medium">
-              Fokus pada pembayaran mandiri, transparansi laporan kas, dan tracking tagihan pribadi.
-            </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6">
+          {/* 1. ADMIN */}
+          <div className="p-5 rounded-3xl bg-purple-50/60 border border-purple-200 space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="px-3 py-1 rounded-full bg-purple-700 text-white text-xs font-black uppercase tracking-wider">
+                  👑 1. Administrator
+                </span>
+                <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
+                  Akses Penuh
+                </span>
+              </div>
+              <p className="text-xs text-purple-950 font-medium">
+                Admin memiliki otoritas tertinggi atas seluruh aplikasi dan pengelolaan akun.
+              </p>
 
-            <div className="space-y-2 text-xs">
-              <div className="flex items-start space-x-2 text-slate-700">
-                <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                <span>Bayar uang kas mingguan (<strong>Rp 6.000 / minggu</strong>) atau bulanan (<strong>Rp 24.000</strong>).</span>
-              </div>
-              <div className="flex items-start space-x-2 text-slate-700">
-                <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                <span>Upload bukti transfer (QRIS, E-Wallet, Bank) & unduh kuitansi digital.</span>
-              </div>
-              <div className="flex items-start space-x-2 text-slate-700">
-                <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                <span>Lihat QR Code ID Anggota untuk setor tunai instan.</span>
-              </div>
-              <div className="flex items-start space-x-2 text-slate-700">
-                <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                <span>Akses Laporan Keuangan Transparan (saldo kas, grafik arus kas, nota belanja kelas).</span>
-              </div>
-              
-              <div className="pt-2 border-t border-emerald-200/60 space-y-1.5 text-rose-700 font-medium">
-                <div className="flex items-start space-x-2">
-                  <Lock className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" />
-                  <span>Aktivitas & riwayat kas anggota lain disembunyikan (hanya kas pribadi & pengeluaran kelas).</span>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                  <span><strong>Menyediakan & mengelola login</strong> untuk seluruh pengguna (Admin, Bendahara, Anggota).</span>
                 </div>
-                <div className="flex items-start space-x-2">
-                  <Lock className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" />
-                  <span>Tidak dapat memverifikasi pembayaran anggota lain.</span>
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                  <span><strong>Tambah anggota baru</strong> dan buat username/password awal.</span>
                 </div>
-                <div className="flex items-start space-x-2">
-                  <Lock className="w-4 h-4 text-rose-500 mt-0.5 shrink-0" />
-                  <span>Tidak dapat menambah/mengedit/menghapus pengeluaran kelas.</span>
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                  <span><strong>Hapus akun anggota/pengguna</strong> dari sistem kas kelas.</span>
+                </div>
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                  <span><strong>Reset kata sandi sementara</strong> (kata sandi asli pengguna terlindungi privasi & tidak dapat dilihat siapapun).</span>
+                </div>
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-purple-600 mt-0.5 shrink-0" />
+                  <span>Konfigurasi data kelas, nominal kas, jatuh tempo, & nomor rekening kas.</span>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-3 p-2.5 bg-purple-100/60 rounded-xl text-[11px] font-semibold text-purple-900">
+              Kredensial Demo: <code className="font-mono bg-white px-1.5 py-0.5 rounded">admin</code> / <code className="font-mono bg-white px-1.5 py-0.5 rounded">admin123</code>
             </div>
           </div>
 
-          {/* BENDAHARA */}
-          <div className="p-5 rounded-3xl bg-blue-50/60 border border-blue-200 space-y-3">
-            <div className="flex items-center space-x-2">
-              <span className="px-3 py-1 rounded-full bg-[#2563EB] text-white text-xs font-black uppercase tracking-wider">
-                👩‍💼 Bendahara Utama
-              </span>
-            </div>
-            <p className="text-xs text-blue-950 font-medium">
-              Wewenang penuh untuk verifikasi dana masuk, pembukuan kas kelas, dan pengeluaran.
-            </p>
+          {/* 2. BENDAHARA */}
+          <div className="p-5 rounded-3xl bg-blue-50/60 border border-blue-200 space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="px-3 py-1 rounded-full bg-[#2563EB] text-white text-xs font-black uppercase tracking-wider">
+                  💼 2. Bendahara
+                </span>
+                <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
+                  Pengelola Kas
+                </span>
+              </div>
+              <p className="text-xs text-blue-950 font-medium">
+                Wewenang penuh untuk operasional arus kas, verifikasi, dan pencatatan pengeluaran.
+              </p>
 
-            <div className="space-y-2 text-xs">
-              <div className="flex items-start space-x-2 text-slate-700">
-                <Check className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                <span>Verifikasi atau tolak bukti transfer pembayaran kas dari 32 anggota.</span>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                  <span>Verifikasi atau tolak bukti transfer pembayaran uang kas dari seluruh siswa.</span>
+                </div>
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                  <span>Input setor tunai langsung (Tandai Lunas kas mingguan / bulanan).</span>
+                </div>
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                  <span>Tambah, edit, dan hapus pengeluaran kas kelas (lengkap nota).</span>
+                </div>
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                  <span>Kirim pengingat pembayaran ke anggota.</span>
+                </div>
+
+                <div className="pt-2 border-t border-blue-200/80 space-y-1 text-rose-700 font-semibold">
+                  <div className="flex items-start space-x-1.5">
+                    <Lock className="w-3.5 h-3.5 text-rose-600 mt-0.5 shrink-0" />
+                    <span><strong>Tidak bisa menambah anggota baru</strong> (Khusus Admin).</span>
+                  </div>
+                  <div className="flex items-start space-x-1.5">
+                    <Lock className="w-3.5 h-3.5 text-rose-600 mt-0.5 shrink-0" />
+                    <span><strong>Tidak bisa menghapus anggota</strong> (Khusus Admin).</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-start space-x-2 text-slate-700">
-                <Check className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                <span>Input setoran tunai manual (Tandai Lunas Rp 6.000 / minggu atau Rp 24.000).</span>
-              </div>
-              <div className="flex items-start space-x-2 text-slate-700">
-                <Check className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                <span>Catat, edit/ganti rincian, dan hapus pengeluaran kas kelas (lengkap konfirmasi keamanan).</span>
-              </div>
-              <div className="flex items-start space-x-2 text-slate-700">
-                <Check className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                <span>Kirim broadcast pengingat tagihan massal / per anggota.</span>
-              </div>
-              <div className="flex items-start space-x-2 text-slate-700">
-                <Check className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                <span>Ekspor laporan kas resmi (PDF / Cetak / CSV Excel).</span>
-              </div>
+            </div>
+
+            <div className="mt-3 p-2.5 bg-blue-100/60 rounded-xl text-[11px] font-semibold text-blue-900">
+              Kredensial Demo: <code className="font-mono bg-white px-1.5 py-0.5 rounded">bendahara</code> / <code className="font-mono bg-white px-1.5 py-0.5 rounded">bendahara123</code>
             </div>
           </div>
-        </div>
 
-        {/* Administrator note */}
-        <div className="mt-4 p-4 rounded-2xl bg-purple-50 border border-purple-200 flex items-center justify-between text-xs text-purple-900">
-          <div className="flex items-center space-x-2">
-            <span className="font-black uppercase tracking-wider text-[10px] px-2 py-0.5 bg-purple-600 text-white rounded-full">
-              ⚙️ Administrator
-            </span>
-            <span>Memiliki hak penuh untuk konfigurasi kelas, kelola 32 akun pengguna, serta audit logs.</span>
+          {/* 3. ANGGOTA */}
+          <div className="p-5 rounded-3xl bg-emerald-50/60 border border-emerald-200 space-y-3 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="px-3 py-1 rounded-full bg-emerald-700 text-white text-xs font-black uppercase tracking-wider">
+                  🎓 3. Anggota (32 Siswa)
+                </span>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                  Siswa
+                </span>
+              </div>
+              <p className="text-xs text-emerald-950 font-medium">
+                Siswa membayar uang kas secara mandiri dan memantau transparansi keuangan kelas.
+              </p>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                  <span>Login dengan kata sandi pribadi yang 100% rahasia (tidak bisa dilihat oleh sesama siswa, bendahara, atau admin).</span>
+                </div>
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                  <span>Bayar uang kas mingguan Rp 6.000 atau bulanan Rp 24.000 via QRIS / Rekening / Tunai.</span>
+                </div>
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                  <span>Upload bukti transfer & unduh kuitansi digital lunas.</span>
+                </div>
+                <div className="flex items-start space-x-2 text-slate-700">
+                  <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                  <span>Lihat QR ID Anggota, riwayat pembayaran pribadi, dan laporan kas terbuka.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 p-2.5 bg-emerald-100/60 rounded-xl text-[11px] font-semibold text-emerald-900">
+              Kredensial Demo: <code className="font-mono bg-white px-1.5 py-0.5 rounded">anggota01</code> / <code className="font-mono bg-white px-1.5 py-0.5 rounded">kas12345</code>
+            </div>
           </div>
         </div>
 

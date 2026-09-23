@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { PaymentStatus } from '../types';
-import { CreditCard, History, FileText, CheckCircle2, AlertTriangle, Clock, ArrowRight, ShieldCheck, QrCode, Wallet, TrendingUp, Sparkles, Check, XCircle, Camera, Edit3 } from 'lucide-react';
+import { CreditCard, History, FileText, CheckCircle2, AlertTriangle, Clock, ArrowRight, ShieldCheck, QrCode, Wallet, TrendingUp, Sparkles, Check, XCircle, Camera, Edit3, Coins, Lock, KeyRound, Mail } from 'lucide-react';
 import { ProfilePhotoModal } from './ProfilePhotoModal';
 import { EditNameModal } from './EditNameModal';
+import { UserProfileModal } from './UserProfileModal';
+import { SelfPasswordModal } from './SelfPasswordModal';
+import { PaymentDurationOption } from './PaymentModal';
 
 interface MemberDashboardProps {
-  onOpenPayModal: () => void;
+  onOpenPayModal: (option?: PaymentDurationOption) => void;
   setActiveTab: (tab: string) => void;
   onOpenQrModal: () => void;
 }
@@ -19,6 +22,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
   const { currentUser, classGroup, payments, totalBalance, paidMembersCount, users } = useApp();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const weeklyFee = classGroup.weeklyDues || 6000;
   const monthlyFee = classGroup.monthlyDues || 24000;
@@ -79,21 +83,42 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
               <p className="text-blue-100 text-xs sm:text-sm font-medium">
                 Iuran kas: <strong>Rp {weeklyFee.toLocaleString('id-ID')} / minggu</strong> • {totalMembers} Anggota {classGroup.name}
               </p>
-              <div className="flex flex-wrap items-center gap-3 pt-1">
+
+              {/* Google Email Connected Indicator */}
+              <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] text-blue-100">
+                <span className="flex items-center space-x-1.5 bg-black/20 px-2.5 py-0.5 rounded-lg border border-white/10">
+                  <Mail className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Google: <strong className="text-white font-mono">{currentUser.googleEmail || currentUser.email}</strong></span>
+                </span>
+                <span className="px-2 py-0.5 bg-emerald-400/25 text-emerald-200 border border-emerald-400/40 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                  ✓ Email Terverifikasi
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 pt-1.5">
                 <button
-                  onClick={() => setIsNameModalOpen(true)}
-                  className="text-[11px] font-black text-white hover:text-amber-200 uppercase tracking-wider bg-white/15 hover:bg-white/25 px-2.5 py-1 rounded-lg flex items-center space-x-1.5 cursor-pointer border border-white/20 transition-all"
-                  title="Ubah Nama Pengguna"
+                  onClick={() => setIsPasswordModalOpen(true)}
+                  className="text-[11px] font-black text-emerald-950 uppercase tracking-wider bg-emerald-300 hover:bg-emerald-200 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 cursor-pointer shadow-md shadow-emerald-950/20 transition-all border border-emerald-200"
+                  title="Atur atau Ubah Kata Sandi Pribadi Anda Sendiri"
                 >
-                  <Edit3 className="w-3 h-3 text-amber-300" />
-                  <span>Ganti Nama</span>
+                  <Lock className="w-3.5 h-3.5 text-emerald-900" />
+                  <span>🔐 Atur & Ubah Sandi Pribadi</span>
                 </button>
                 <button
                   onClick={() => setIsProfileModalOpen(true)}
-                  className="text-[11px] font-black text-amber-200 hover:text-white uppercase tracking-wider underline flex items-center space-x-1 cursor-pointer"
+                  className="text-[11px] font-black text-slate-900 uppercase tracking-wider bg-amber-300 hover:bg-amber-200 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 cursor-pointer shadow-md shadow-amber-950/20 transition-all border border-amber-200"
+                  title="Kelola Foto Profil, Username Login & Kontak Siswa"
                 >
-                  <Camera className="w-3 h-3" />
-                  <span>Ubah Foto</span>
+                  <Camera className="w-3.5 h-3.5 text-slate-900" />
+                  <span>⚙️ Opsi Profil & Username</span>
+                </button>
+                <button
+                  onClick={() => setIsNameModalOpen(true)}
+                  className="text-[11px] font-black text-white hover:text-amber-200 uppercase tracking-wider bg-white/15 hover:bg-white/25 px-2.5 py-1.5 rounded-xl flex items-center space-x-1.5 cursor-pointer border border-white/20 transition-all"
+                  title="Ubah Nama Tampilan Siswa"
+                >
+                  <Edit3 className="w-3 h-3 text-amber-300" />
+                  <span>Ganti Nama</span>
                 </button>
               </div>
             </div>
@@ -101,21 +126,87 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
 
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={onOpenPayModal}
-              className="px-6 py-3.5 rounded-2xl bg-white text-[#2563EB] hover:bg-blue-50 active:scale-95 font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-900/20 flex items-center space-x-2 transition-all cursor-pointer"
+              onClick={() => onOpenPayModal('nominal_1000')}
+              className="px-5 py-3.5 rounded-2xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-950/20 flex items-center space-x-2 transition-all cursor-pointer border border-amber-300"
+              title="Bayar Uang Kas Ringan Rp 1.000"
+            >
+              <Coins className="w-4 h-4 text-slate-950" />
+              <span>BAYAR KAS RP 1.000</span>
+            </button>
+            <button
+              onClick={() => onOpenPayModal('1_minggu')}
+              className="px-5 py-3.5 rounded-2xl bg-white text-[#2563EB] hover:bg-blue-50 active:scale-95 font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-900/20 flex items-center space-x-2 transition-all cursor-pointer"
             >
               <CreditCard className="w-4 h-4" />
-              <span>BAYAR KAS DIGITAL</span>
+              <span>BAYAR KAS MINGGUAN</span>
             </button>
             <button
               onClick={onOpenQrModal}
-              className="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md text-white font-black text-xs uppercase tracking-wider flex items-center space-x-2 border border-white/20 transition-all cursor-pointer"
+              className="px-4 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md text-white font-black text-xs uppercase tracking-wider flex items-center space-x-2 border border-white/20 transition-all cursor-pointer"
             >
               <QrCode className="w-4 h-4" />
               <span>ID QR Setor</span>
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Self-service Password Setup Alert for Members who haven't set custom password */}
+      {!currentUser.hasCustomPassword && (
+        <div className="rounded-3xl bg-linear-to-r from-emerald-50 via-teal-50 to-blue-50 p-4 sm:p-5 border border-emerald-300 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3.5">
+            <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-sm shrink-0">
+              <KeyRound className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                  Atur Sandi Pribadi Anda Sendiri
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-black text-[9px] uppercase tracking-wider">
+                  100% Privat
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 font-medium mt-0.5">
+                Akun Anda saat ini masih memakai sandi bawaan. Buat kata sandi rahasia Anda sendiri yang tidak bisa dilihat oleh siapa pun (termasuk Admin & Bendahara).
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsPasswordModalOpen(true)}
+            className="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-emerald-500/20 flex items-center space-x-2 transition-all cursor-pointer shrink-0"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span>Atur Sandi Sekarang</span>
+          </button>
+        </div>
+      )}
+
+      {/* Opsi Bayar Kas Rp 1.000 (Cicilan Fleksibel) */}
+      <div className="rounded-3xl bg-linear-to-r from-amber-50/90 via-orange-50/40 to-blue-50/70 p-5 sm:p-6 border border-amber-200/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="p-3 bg-amber-500 text-slate-950 rounded-2xl shadow-sm shrink-0">
+            <Coins className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Opsi Bayar Kas Rp 1.000 Tersedia!</h3>
+              <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-black text-[9px] uppercase tracking-wider">
+                Khusus Anggota
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 font-medium mt-0.5">
+              Ingin menyicil uang kas harian atau bayar uang receh? Anggota dapat setor langsung kelipatan Rp 1.000 via QRIS, e-Wallet, atau tunai ke bendahara.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => onOpenPayModal('nominal_1000')}
+          className="px-5 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs uppercase tracking-wider shadow-md shadow-amber-200 flex items-center space-x-2 transition-all cursor-pointer shrink-0"
+        >
+          <Coins className="w-4 h-4 text-slate-950" />
+          <span>Bayar Kas Rp 1.000</span>
+        </button>
       </div>
 
       {/* Weekly Breakdown Matrix for Member */}
@@ -329,8 +420,8 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
         </button>
       </div>
 
-      {/* Profile Photo Modal */}
-      <ProfilePhotoModal
+      {/* User Profile Modal */}
+      <UserProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
       />
@@ -340,6 +431,12 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
         user={currentUser}
         isOpen={isNameModalOpen}
         onClose={() => setIsNameModalOpen(false)}
+      />
+
+      {/* Self Password Modal */}
+      <SelfPasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
       />
     </div>
   );

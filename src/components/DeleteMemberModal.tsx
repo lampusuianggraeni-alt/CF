@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { User } from '../types';
-import { Trash2, AlertTriangle, X, ShieldAlert, CheckCircle2, UserX } from 'lucide-react';
+import { Trash2, AlertTriangle, X, ShieldAlert, CheckCircle2, UserX, AlertCircle } from 'lucide-react';
 
 interface DeleteMemberModalProps {
   user: User | null;
@@ -13,6 +13,21 @@ export const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({ user, isOp
   const { deleteUser, payments, users, currentUser } = useApp();
   const [deletePaymentsHistory, setDeletePaymentsHistory] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDeleteError(null);
+  }, [user, isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !user) return null;
 
@@ -24,7 +39,7 @@ export const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({ user, isOp
 
   const handleDelete = () => {
     if (isOnlyAdmin) {
-      alert('Tidak dapat menghapus satu-satunya akun Admin! Ubah peran akun lain menjadi Admin terlebih dahulu.');
+      setDeleteError('Tidak dapat menghapus satu-satunya akun Admin! Ubah peran akun lain menjadi Admin terlebih dahulu.');
       return;
     }
 
@@ -37,7 +52,12 @@ export const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({ user, isOp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+    >
       <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 relative border border-slate-200 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -57,6 +77,13 @@ export const DeleteMemberModal: React.FC<DeleteMemberModalProps> = ({ user, isOp
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {deleteError && (
+          <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 font-bold flex items-center space-x-2 text-xs">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <span>{deleteError}</span>
+          </div>
+        )}
 
         {/* Member Preview Card */}
         <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center space-x-4">

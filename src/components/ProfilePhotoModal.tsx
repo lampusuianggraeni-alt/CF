@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { X, Upload, Camera, Image as ImageIcon, Check, Sparkles, RefreshCw, Link as LinkIcon, AlertCircle } from 'lucide-react';
 
@@ -37,6 +37,16 @@ export const ProfilePhotoModal: React.FC<ProfilePhotoModalProps> = ({ isOpen, on
   const [dragOver, setDragOver] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -117,7 +127,12 @@ export const ProfilePhotoModal: React.FC<ProfilePhotoModalProps> = ({ isOpen, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto"
+    >
       <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-8 relative border border-slate-100 my-8">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
