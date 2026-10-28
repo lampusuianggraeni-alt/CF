@@ -80,6 +80,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({ setAct
             </select>
 
             <button
+              type="button"
               onClick={handleExportCSV}
               className="px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-xs uppercase tracking-wider flex items-center space-x-2 transition-colors cursor-pointer border border-slate-200"
             >
@@ -88,6 +89,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({ setAct
             </button>
 
             <button
+              type="button"
               onClick={handlePrintReport}
               className="px-5 py-3 rounded-2xl bg-[#2563EB] hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-blue-200 flex items-center space-x-2 transition-all cursor-pointer"
             >
@@ -210,17 +212,23 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({ setAct
             </div>
 
             <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 text-xs">
-              {expenses.map((e) => (
-                <div key={e.id} className="py-2.5 flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-slate-900">{e.description}</p>
-                    <p className="text-[10px] text-slate-400">{e.date} • {e.category}</p>
-                  </div>
-                  <span className="font-extrabold text-rose-600">
-                    - Rp {e.amount.toLocaleString('id-ID')}
-                  </span>
+              {expenses.length === 0 ? (
+                <div className="py-8 text-center text-slate-400">
+                  <p className="text-xs font-semibold">Belum ada pengeluaran kas tercatat</p>
                 </div>
-              ))}
+              ) : (
+                expenses.map((e) => (
+                  <div key={e.id} className="py-2.5 flex justify-between items-center">
+                    <div>
+                      <p className="font-bold text-slate-900">{e.description}</p>
+                      <p className="text-[10px] text-slate-400">{e.date} • {e.category}</p>
+                    </div>
+                    <span className="font-extrabold text-rose-600">
+                      - Rp {e.amount.toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -249,7 +257,8 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({ setAct
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
                   <th className="py-2.5 px-3">No</th>
-                  <th className="py-2.5 px-3">Nama Anggota</th>
+                  <th className="py-2.5 px-3">NISN</th>
+                  <th className="py-2.5 px-3">Nama Lengkap Siswa</th>
                   <th className="py-2.5 px-3">Juli 2026</th>
                   <th className="py-2.5 px-3">Agustus 2026</th>
                   <th className="py-2.5 px-3">Status</th>
@@ -257,7 +266,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({ setAct
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {(isTreasurerOrAdmin
-                  ? users.filter((u) => u.role !== 'admin')
+                  ? users.filter((u) => u.role === 'anggota')
                   : users.filter((u) => u.id === currentUser.id)
                 ).map((u, idx) => {
                   const pJul = payments.find((p) => p.userId === u.id && p.monthPeriod === 'Juli 2026' && p.status === 'lunas');
@@ -266,6 +275,7 @@ export const FinancialReportView: React.FC<FinancialReportViewProps> = ({ setAct
                   return (
                     <tr key={u.id} className="hover:bg-slate-50">
                       <td className="py-2 px-3 text-slate-400 font-mono">{idx + 1}</td>
+                      <td className="py-2 px-3 font-mono font-bold text-slate-600">{u.nisn || '-'}</td>
                       <td className="py-2 px-3 font-bold text-slate-900">
                         {u.name}
                         {u.id === currentUser.id && (

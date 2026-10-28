@@ -18,6 +18,7 @@ import {
   History,
   Lock
 } from 'lucide-react';
+import { getTreasurerInfo } from '../lib/userRoles';
 
 interface MemberProfileDetailModalProps {
   user: User | null;
@@ -34,7 +35,7 @@ export const MemberProfileDetailModal: React.FC<MemberProfileDetailModalProps> =
   onRecordCash,
   onViewHistory,
 }) => {
-  const { classGroup, payments } = useApp();
+  const { classGroup, payments, currentUser } = useApp();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -68,11 +69,13 @@ export const MemberProfileDetailModal: React.FC<MemberProfileDetailModalProps> =
     status = 'menunggu';
   }
 
-  // Format WhatsApp Link
+  // Format WhatsApp Link with specific Treasurer designation
   const cleanPhone = (user.phone || '').replace(/\D/g, '');
   const waPhone = cleanPhone.startsWith('0') ? `62${cleanPhone.slice(1)}` : cleanPhone;
+  const treasurerInfo = getTreasurerInfo(currentUser);
+  const senderLabel = treasurerInfo.isTreasurer ? treasurerInfo.senderTitle : `Bendahara (${currentUser.name})`;
   const waUrl = cleanPhone 
-    ? `https://wa.me/${waPhone}?text=Halo%20${encodeURIComponent(user.name)},%20ini%20informasi%20dari%20Bendahara%20Kas%20${encodeURIComponent(classGroup.name)}`
+    ? `https://wa.me/${waPhone}?text=Halo%20${encodeURIComponent(user.name)},%20ini%20informasi%20dari%20${encodeURIComponent(senderLabel)}%20Kas%20${encodeURIComponent(classGroup.name)}`
     : null;
 
   return (
@@ -215,14 +218,6 @@ export const MemberProfileDetailModal: React.FC<MemberProfileDetailModalProps> =
                     </a>
                   )}
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-50/60 border border-blue-100">
-                <span className="flex items-center space-x-2 text-slate-600 font-medium">
-                  <Mail className="w-4 h-4 text-blue-600" />
-                  <span>Email Google Login:</span>
-                </span>
-                <span className="font-mono font-bold text-blue-700 truncate max-w-[180px]">{user.googleEmail || user.email || '-'}</span>
               </div>
 
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">

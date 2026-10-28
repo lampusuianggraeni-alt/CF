@@ -47,7 +47,7 @@ export const PaymentHistoryView: React.FC = () => {
   const [selectedUserForHistory, setSelectedUserForHistory] = useState<User | null>(null);
 
   const isStaff = currentUser.role === 'bendahara' || currentUser.role === 'admin';
-  const memberUsers = users.filter((u) => u.role !== 'admin');
+  const memberUsers = users.filter((u) => u.role === 'anggota');
 
   // Base list depending on role
   const relevantPayments = isStaff

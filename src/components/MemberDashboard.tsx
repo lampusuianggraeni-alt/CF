@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { PaymentStatus } from '../types';
-import { CreditCard, History, FileText, CheckCircle2, AlertTriangle, Clock, ArrowRight, ShieldCheck, QrCode, Wallet, TrendingUp, Sparkles, Check, XCircle, Camera, Edit3, Coins, Lock, KeyRound, Mail } from 'lucide-react';
+import { CreditCard, History, FileText, CheckCircle2, AlertTriangle, Clock, ArrowRight, ShieldCheck, QrCode, Wallet, TrendingUp, Sparkles, Check, XCircle, Camera, Edit3, Coins, Lock, KeyRound, Mail, Bell } from 'lucide-react';
 import { ProfilePhotoModal } from './ProfilePhotoModal';
 import { EditNameModal } from './EditNameModal';
 import { UserProfileModal } from './UserProfileModal';
@@ -19,13 +19,18 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
   setActiveTab,
   onOpenQrModal,
 }) => {
-  const { currentUser, classGroup, payments, totalBalance, paidMembersCount, users } = useApp();
+  const { currentUser, classGroup, payments, totalBalance, paidMembersCount, users, notifications } = useApp();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNameModalOpen, setIsNameModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   const weeklyFee = classGroup.weeklyDues || 6000;
   const monthlyFee = classGroup.monthlyDues || 24000;
+
+  // Find latest active reminder for this member
+  const latestReminder = notifications.find(
+    (n) => (n.userId === currentUser.id || n.userId === 'all') && n.type === 'reminder' && !n.isRead
+  );
 
   // Find all payments for current member in this month
   const userMonthPayments = payments.filter(
@@ -84,14 +89,14 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
                 Iuran kas: <strong>Rp {weeklyFee.toLocaleString('id-ID')} / minggu</strong> • {totalMembers} Anggota {classGroup.name}
               </p>
 
-              {/* Google Email Connected Indicator */}
+              {/* NISN Connected Indicator */}
               <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] text-blue-100">
                 <span className="flex items-center space-x-1.5 bg-black/20 px-2.5 py-0.5 rounded-lg border border-white/10">
-                  <Mail className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Google: <strong className="text-white font-mono">{currentUser.googleEmail || currentUser.email}</strong></span>
+                  <CreditCard className="w-3.5 h-3.5 text-amber-300" />
+                  <span>NISN: <strong className="text-white font-mono">{currentUser.nisn || '-'}</strong></span>
                 </span>
                 <span className="px-2 py-0.5 bg-emerald-400/25 text-emerald-200 border border-emerald-400/40 rounded-lg text-[10px] font-black uppercase tracking-wider">
-                  ✓ Email Terverifikasi
+                  ✓ NISN Terverifikasi
                 </span>
               </div>
 
@@ -105,20 +110,13 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
                   <span>🔐 Atur & Ubah Sandi Pribadi</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setIsProfileModalOpen(true)}
                   className="text-[11px] font-black text-slate-900 uppercase tracking-wider bg-amber-300 hover:bg-amber-200 px-3 py-1.5 rounded-xl flex items-center space-x-1.5 cursor-pointer shadow-md shadow-amber-950/20 transition-all border border-amber-200"
                   title="Kelola Foto Profil, Username Login & Kontak Siswa"
                 >
                   <Camera className="w-3.5 h-3.5 text-slate-900" />
                   <span>⚙️ Opsi Profil & Username</span>
-                </button>
-                <button
-                  onClick={() => setIsNameModalOpen(true)}
-                  className="text-[11px] font-black text-white hover:text-amber-200 uppercase tracking-wider bg-white/15 hover:bg-white/25 px-2.5 py-1.5 rounded-xl flex items-center space-x-1.5 cursor-pointer border border-white/20 transition-all"
-                  title="Ubah Nama Tampilan Siswa"
-                >
-                  <Edit3 className="w-3 h-3 text-amber-300" />
-                  <span>Ganti Nama</span>
                 </button>
               </div>
             </div>
@@ -150,6 +148,44 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Active Reminder Banner from Bendahara 1 or Bendahara 2 */}
+      {latestReminder && (
+        <div className="rounded-3xl bg-amber-500/10 border-2 border-amber-400 p-4 sm:p-5 text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-fade-in">
+          <div className="flex items-start space-x-3.5">
+            <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-sm shrink-0">
+              <Bell className="w-5 h-5 animate-bounce" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900 font-black text-[10px] uppercase tracking-wider">
+                  {latestReminder.senderRole || 'Pengingat Resmi Bendahara'}
+                </span>
+                <span className="text-[11px] text-amber-700 font-bold">{latestReminder.createdAt}</span>
+              </div>
+              <h3 className="text-sm font-black text-amber-950 uppercase mt-1">
+                {latestReminder.title}
+              </h3>
+              <p className="text-xs text-amber-900 font-medium mt-1 leading-relaxed whitespace-pre-line">
+                {latestReminder.message}
+              </p>
+              {latestReminder.senderName && (
+                <p className="text-[11px] font-black text-blue-800 mt-1.5 flex items-center space-x-1">
+                  <span>📢 Dikirim oleh:</span>
+                  <span className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded-md font-extrabold">{latestReminder.senderName}</span>
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => onOpenPayModal('1_minggu')}
+            className="px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs uppercase tracking-wider shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer shrink-0"
+          >
+            <CreditCard className="w-4 h-4" />
+            <span>Bayar Sekarang</span>
+          </button>
+        </div>
+      )}
 
       {/* Self-service Password Setup Alert for Members who haven't set custom password */}
       {!currentUser.hasCustomPassword && (
@@ -284,7 +320,8 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
           </div>
           {!isFullMonthPaid && (
             <button
-              onClick={onOpenPayModal}
+              type="button"
+              onClick={() => onOpenPayModal('1_minggu')}
               className="px-4 py-2 bg-[#2563EB] hover:bg-blue-700 text-white font-black rounded-xl uppercase tracking-wider shadow-xs cursor-pointer shrink-0"
             >
               Bayar Sisa Tagihan
@@ -327,9 +364,14 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-            <div className="text-xs text-slate-500">
-              Bendahara Kelas: <span className="font-black text-slate-900">{classGroup.treasurerName}</span>
+          <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="text-xs text-slate-500 space-y-0.5">
+              <div>
+                Bendahara 1: <strong className="text-indigo-900 font-black">ANDI MAITALIDIYANI M. (Maita)</strong>
+              </div>
+              <div>
+                Bendahara 2: <strong className="text-teal-900 font-black">FIOREN KHANZA FAISAL (Fioren)</strong>
+              </div>
             </div>
 
             <button
@@ -375,7 +417,8 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
       {/* Quick Action Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <button
-          onClick={onOpenPayModal}
+          type="button"
+          onClick={() => onOpenPayModal('1_minggu')}
           className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs hover:border-[#2563EB] hover:shadow-md transition-all text-left group flex items-center space-x-4 cursor-pointer"
         >
           <div className="p-3.5 rounded-2xl bg-blue-50 text-[#2563EB] group-hover:bg-[#2563EB] group-hover:text-white transition-colors">
@@ -390,6 +433,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('riwayat')}
           className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs hover:border-emerald-500 hover:shadow-md transition-all text-left group flex items-center space-x-4 cursor-pointer"
         >
@@ -405,6 +449,7 @@ export const MemberDashboard: React.FC<MemberDashboardProps> = ({
         </button>
 
         <button
+          type="button"
           onClick={() => setActiveTab('laporan')}
           className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs hover:border-purple-500 hover:shadow-md transition-all text-left group flex items-center space-x-4 cursor-pointer"
         >

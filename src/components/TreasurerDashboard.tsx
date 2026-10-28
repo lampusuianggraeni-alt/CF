@@ -8,14 +8,18 @@ import { UserProfileModal } from './UserProfileModal';
 import { MemberProfileDetailModal } from './MemberProfileDetailModal';
 import { RecordCashPaymentModal } from './RecordCashPaymentModal';
 import { MemberPaymentHistoryModal } from './MemberPaymentHistoryModal';
+import { PortalLinksModal } from './PortalLinksModal';
+import { SendReminderModal } from './SendReminderModal';
+import { getTreasurerInfo } from '../lib/userRoles';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
-import { Wallet, Users, ArrowUpRight, ArrowDownRight, Bell, CheckCircle2, Clock, AlertTriangle, Search, Filter, PlusCircle, Settings, ShieldCheck, Mail, Send, Camera, Edit3, Lock, ShieldAlert, Coins, History, FileText, Eye } from 'lucide-react';
+import { Wallet, Users, ArrowUpRight, ArrowDownRight, Bell, CheckCircle2, Clock, AlertTriangle, Search, Filter, PlusCircle, Settings, ShieldCheck, Mail, Send, Camera, Edit3, Lock, ShieldAlert, Coins, History, FileText, Eye, Link as LinkIcon, RefreshCw, UserCheck } from 'lucide-react';
 
 interface TreasurerDashboardProps {
   setActiveTab: (tab: string) => void;
+  initialSection?: 'overview' | 'checklist';
 }
 
-export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiveTab }) => {
+export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiveTab, initialSection = 'overview' }) => {
   const {
     currentUser,
     classGroup,
@@ -30,7 +34,10 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
     pendingVerificationCount,
     sendReminder,
     markPaidManual,
+    switchUser,
   } = useApp();
+
+  const treasurerInfo = getTreasurerInfo(currentUser);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('semua');
@@ -47,21 +54,32 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
   const [selectedUserForCash, setSelectedUserForCash] = useState<User | null>(null);
   const [isMemberHistoryOpen, setIsMemberHistoryOpen] = useState<boolean>(false);
   const [selectedUserForHistory, setSelectedUserForHistory] = useState<User | null>(null);
+  const [isPortalLinksOpen, setIsPortalLinksOpen] = useState<boolean>(false);
 
-  const memberUsers = users.filter((u) => u.role !== 'admin');
+  // State for SendReminderModal
+  const [isSendReminderOpen, setIsSendReminderOpen] = useState<boolean>(false);
+  const [selectedUserForReminder, setSelectedUserForReminder] = useState<User | null>(null);
 
-  // Broadcast reminder to all unpaid members
+  const checklistRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (initialSection === 'checklist' && checklistRef.current) {
+      checklistRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [initialSection]);
+
+  const memberUsers = users.filter((u) => u.role === 'anggota');
+
+  // Broadcast reminder to all unpaid members (opens modal with preview & WhatsApp option)
   const handleBroadcastReminder = () => {
-    sendReminder('all');
-    setReminderToast(`Pengingat pembayaran otomatis dikirimkan ke ${unpaidMembersCount} anggota yang belum bayar.`);
-    setTimeout(() => setReminderToast(null), 4000);
+    setSelectedUserForReminder(null);
+    setIsSendReminderOpen(true);
   };
 
-  // Single member reminder
+  // Single member reminder (opens modal with preview & WhatsApp option)
   const handleSingleReminder = (user: User) => {
-    sendReminder(user.id);
-    setReminderToast(`Notifikasi pengingat kas dikirimkan ke ${user.name}.`);
-    setTimeout(() => setReminderToast(null), 4000);
+    setSelectedUserForReminder(user);
+    setIsSendReminderOpen(true);
   };
 
   // Filter members list with accurate payment calculations
@@ -96,7 +114,9 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
       userMonthPayments,
     };
   }).filter((item) => {
-    const matchesSearch = item.user.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch =
+      item.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.user.nisn && item.user.nisn.includes(searchTerm));
     const matchesStatus = selectedStatusFilter === 'semua' || 
       (selectedStatusFilter === 'lunas' && item.status === 'lunas') ||
       (selectedStatusFilter === 'dicicil' && item.status === 'dicicil') ||
@@ -131,8 +151,14 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
         </div>
       )}
 
-      {/* Role Notice & Welcome Banner */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* Role Notice & Welcome Banner with Clear Bendahara 1 vs Bendahara 2 Display */}
+      <div className={`rounded-3xl p-6 border shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all ${
+        treasurerInfo.treasurerNumber === 1
+          ? 'bg-gradient-to-r from-indigo-50/90 via-white to-blue-50/60 border-indigo-200'
+          : treasurerInfo.treasurerNumber === 2
+          ? 'bg-gradient-to-r from-teal-50/90 via-white to-emerald-50/60 border-teal-200'
+          : 'bg-white border-slate-200'
+      }`}>
         <div className="flex items-center space-x-4">
           <div
             onClick={() => setIsSelfProfileModalOpen(true)}
@@ -142,50 +168,104 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
             <img
               src={currentUser.avatar}
               alt={currentUser.name}
-              className="w-14 h-14 rounded-2xl object-cover border-2 border-blue-500/20 shadow-sm"
+              className={`w-16 h-16 rounded-2xl object-cover border-2 shadow-sm ${
+                treasurerInfo.treasurerNumber === 1 ? 'border-indigo-500' : 'border-teal-500'
+              }`}
             />
             <div className="absolute inset-0 bg-black/40 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <Camera className="w-4 h-4 text-white" />
             </div>
           </div>
           <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-100 text-[#2563EB]">
-                💼 Bendahara Kas
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-lg shadow-xs ${
+                treasurerInfo.treasurerNumber === 1
+                  ? 'bg-indigo-600 text-white ring-2 ring-indigo-200'
+                  : treasurerInfo.treasurerNumber === 2
+                  ? 'bg-teal-600 text-white ring-2 ring-teal-200'
+                  : 'bg-blue-600 text-white'
+              }`}>
+                💼 {treasurerInfo.shortLabel.toUpperCase()} ({treasurerInfo.callName})
               </span>
-              <span className="text-xs font-bold text-slate-400">{classGroup.name}</span>
+              <span className="text-xs font-bold text-slate-500">{classGroup.name}</span>
             </div>
-            <div className="flex items-center space-x-2 mt-0.5">
+
+            <div className="flex items-center space-x-2 mt-1">
               <h1 className="text-xl font-black text-slate-900">{currentUser.name}</h1>
               <button
+                type="button"
                 onClick={() => setIsSelfProfileModalOpen(true)}
-                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#2563EB] rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center space-x-1 transition-colors cursor-pointer"
+                className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center space-x-1 transition-colors cursor-pointer ${
+                  treasurerInfo.treasurerNumber === 1
+                    ? 'bg-indigo-100/80 text-indigo-800 hover:bg-indigo-200'
+                    : 'bg-teal-100/80 text-teal-800 hover:bg-teal-200'
+                }`}
                 title="Kelola Profil & Akun Bendahara"
               >
                 <Edit3 className="w-3 h-3" />
-                <span>Opsi Profil</span>
+                <span>Opsi Akun</span>
               </button>
             </div>
-            <p className="text-xs text-slate-500">
-              Kelola kas kelas, verifikasi transaksi masuk, catat setor tunai, & periksa identitas anggota.
-            </p>
+
+            <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs">
+              <span className="text-slate-600">
+                Bertugas bersama: <strong>{treasurerInfo.partnerName}</strong> ({treasurerInfo.partnerRole})
+              </span>
+              {treasurerInfo.partnerUsername && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const partner = users.find(
+                      (u) =>
+                        u.username === treasurerInfo.partnerUsername ||
+                        (treasurerInfo.partnerRole === 'Bendahara 2' ? u.nisn === '0123428941' : u.nisn === '3124652885')
+                    );
+                    if (partner) {
+                      switchUser(partner.id);
+                      setReminderToast(`Beralih ke akun ${treasurerInfo.partnerRole} (${treasurerInfo.partnerName})`);
+                      setTimeout(() => setReminderToast(null), 3000);
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-black text-[10px] uppercase flex items-center space-x-1 shadow-xs transition-all cursor-pointer"
+                  title={`Klik untuk cepat beralih ke akun ${treasurerInfo.partnerRole}`}
+                >
+                  <RefreshCw className="w-3 h-3 text-blue-600" />
+                  <span>Beralih ke {treasurerInfo.partnerRole} ({treasurerInfo.callName === 'Maita' ? 'Fioren' : 'Maita'})</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-stretch md:self-auto">
           <button
-            onClick={() => setActiveTab('expenses')}
+            type="button"
+            onClick={() => setIsPortalLinksOpen(true)}
+            className="flex-1 md:flex-none px-4 py-2.5 rounded-2xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+          >
+            <LinkIcon className="w-4 h-4 text-emerald-600" />
+            <span>Link Portal Siswa & Bendahara</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('pengeluaran')}
             className="flex-1 md:flex-none px-4 py-2.5 rounded-2xl bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
           >
             <ArrowDownRight className="w-4 h-4 text-rose-600" />
             <span>+ Catat Pengeluaran Kas</span>
           </button>
           <button
+            type="button"
             onClick={handleBroadcastReminder}
-            className="flex-1 md:flex-none px-4 py-2.5 rounded-2xl bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+            className={`flex-1 md:flex-none px-4 py-2.5 rounded-2xl text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md transition-all cursor-pointer ${
+              treasurerInfo.treasurerNumber === 1
+                ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20'
+                : 'bg-teal-600 hover:bg-teal-700 shadow-teal-500/20'
+            }`}
+            title={`Kirim pengingat masal atas nama ${treasurerInfo.shortLabel} (${treasurerInfo.callName})`}
           >
             <Send className="w-3.5 h-3.5" />
-            <span>Kirim Pengingat Masal ({unpaidMembersCount})</span>
+            <span>Kirim Pengingat ({unpaidMembersCount}) — {treasurerInfo.shortLabel}</span>
           </button>
         </div>
       </div>
@@ -195,7 +275,7 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
         <div className="flex items-center space-x-2">
           <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
           <span>
-            <strong>Batas Wewenang Role Bendahara:</strong> Bendahara tidak memiliki izin untuk menambah atau menghapus anggota. Manajemen anggota dan kata sandi dikelola langsung oleh <strong>Administrator</strong>.
+            <strong>Batas Wewenang Role Bendahara:</strong> Bendahara tidak memiliki izin untuk menambah/menghapus anggota maupun mengubah <strong>Nama Lengkap & NISN</strong> siswa. Identitas dan kata sandi dikelola langsung oleh <strong>Administrator</strong>.
           </span>
         </div>
       </div>
@@ -379,7 +459,7 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 <span>Lunas:</span>
               </span>
-              <span>{paidMembersCount} Anggota ({Math.round((paidMembersCount / memberUsers.length) * 100)}%)</span>
+              <span>{paidMembersCount} Anggota ({memberUsers.length > 0 ? Math.round((paidMembersCount / memberUsers.length) * 100) : 0}%)</span>
             </div>
             <div className="flex justify-between items-center text-amber-700">
               <span className="flex items-center space-x-1.5">
@@ -400,7 +480,13 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
       </div>
 
       {/* Member Checklist & Cash Recording Table */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+      <div
+        ref={checklistRef}
+        id="checklist-anggota"
+        className={`bg-white rounded-3xl p-6 border shadow-sm space-y-4 transition-all ${
+          initialSection === 'checklist' ? 'border-[#2563EB] ring-2 ring-blue-500/20' : 'border-slate-200'
+        }`}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="font-bold text-slate-900 text-base">Checklist & Verifikasi Anggota ({memberUsers.length} Siswa)</h2>
@@ -491,19 +577,23 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
                           >
                             {user.name}
                           </p>
-                          <button
-                            onClick={() => setSelectedUserForEditName(user)}
-                            className="p-1 text-slate-400 hover:text-[#2563EB] hover:bg-blue-50 rounded transition-colors cursor-pointer"
-                            title={`Ubah nama ${user.name}`}
-                          >
-                            <Edit3 className="w-3 h-3" />
-                          </button>
+                          {currentUser.role === 'admin' && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedUserForEditName(user)}
+                              className="p-1 text-slate-400 hover:text-[#2563EB] hover:bg-blue-50 rounded transition-colors cursor-pointer"
+                              title={`Ubah nama & NISN ${user.name} (Khusus Admin)`}
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
-                        <div className="flex items-center space-x-1.5 text-[10px]">
-                          <span className="font-mono font-bold text-blue-600">@{user.username || 'user'}</span>
-                          {user.nisn && <span className="text-slate-400">• NISN: {user.nisn}</span>}
+                        <div className="flex items-center space-x-1.5 text-[10px] mt-0.5">
+                          <span className="font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                            NISN: {user.nisn || '-'}
+                          </span>
+                          <span className="font-mono text-slate-400">@{user.username || 'user'}</span>
                         </div>
-                        <p className="text-[10px] text-slate-400">{user.email} {user.phone ? `• WA: ${user.phone}` : ''}</p>
                       </div>
                     </div>
                   </td>
@@ -564,6 +654,7 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
                   <td className="py-3.5 px-4 text-right space-x-1 whitespace-nowrap">
                     {/* Tombol Lihat Profil Lengkap Anggota */}
                     <button
+                      type="button"
                       onClick={() => setSelectedUserForProfileDetail(user)}
                       className="px-2.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs transition-colors cursor-pointer inline-flex items-center space-x-1"
                       title={`Lihat foto & profil lengkap ${user.name}`}
@@ -574,6 +665,7 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
 
                     {/* Tombol Riwayat Pembayaran Anggota */}
                     <button
+                      type="button"
                       onClick={() => {
                         setSelectedUserForHistory(user);
                         setIsMemberHistoryOpen(true);
@@ -587,6 +679,7 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
 
                     {/* Tombol Catat Tunai (Bisa Diatur Berapa Ribu) */}
                     <button
+                      type="button"
                       onClick={() => {
                         setSelectedUserForCash(user);
                         setIsRecordCashOpen(true);
@@ -601,6 +694,7 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
                     {/* Verifikasi Bukti jika ada yang menunggu */}
                     {status === 'menunggu' && pendingPayment && (
                       <button
+                        type="button"
                         onClick={() => setSelectedPaymentForVerif(pendingPayment)}
                         className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
                       >
@@ -611,11 +705,17 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
                     {/* Tombol Pengingat jika belum lunas */}
                     {status !== 'lunas' && (
                       <button
+                        type="button"
                         onClick={() => handleSingleReminder(user)}
-                        className="px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold text-xs transition-colors cursor-pointer"
-                        title="Kirim notifikasi pengingat kas"
+                        className={`px-2.5 py-1.5 rounded-xl font-bold text-xs transition-colors cursor-pointer inline-flex items-center space-x-1 ${
+                          treasurerInfo.treasurerNumber === 1
+                            ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+                            : 'bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200'
+                        }`}
+                        title={`Kirim notifikasi pengingat kas atas nama ${treasurerInfo.shortLabel} (${treasurerInfo.callName}) ke ${user.name}`}
                       >
-                        Pengingat
+                        <Bell className="w-3.5 h-3.5" />
+                        <span>Pengingat</span>
                       </button>
                     )}
                   </td>
@@ -698,6 +798,26 @@ export const TreasurerDashboard: React.FC<TreasurerDashboardProps> = ({ setActiv
         user={currentUser}
         isOpen={isSelfNameModalOpen}
         onClose={() => setIsSelfNameModalOpen(false)}
+      />
+
+      {/* Portal Links Modal */}
+      <PortalLinksModal
+        isOpen={isPortalLinksOpen}
+        onClose={() => setIsPortalLinksOpen(false)}
+      />
+
+      {/* Send Reminder Modal with Specific Treasurer Sender Attribution & WhatsApp */}
+      <SendReminderModal
+        isOpen={isSendReminderOpen}
+        onClose={() => {
+          setIsSendReminderOpen(false);
+          setSelectedUserForReminder(null);
+        }}
+        targetUser={selectedUserForReminder}
+        onSent={(msg) => {
+          setReminderToast(msg);
+          setTimeout(() => setReminderToast(null), 4000);
+        }}
       />
     </div>
   );

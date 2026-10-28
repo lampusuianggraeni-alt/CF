@@ -42,8 +42,9 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({ payment, o
             <p className="text-xs text-slate-500 font-medium">Periksa detail transfer anggota</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -118,6 +119,7 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({ payment, o
         {/* Verification Action Buttons */}
         <div className="flex space-x-3 pt-2">
           <button
+            type="button"
             onClick={() => handleAction('belum_bayar')}
             className="w-1/2 py-3 rounded-2xl bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-xs transition-colors flex items-center justify-center space-x-1 cursor-pointer"
           >
@@ -125,6 +127,7 @@ export const VerificationModal: React.FC<VerificationModalProps> = ({ payment, o
             <span>TOLAK PEMBAYARAN</span>
           </button>
           <button
+            type="button"
             onClick={() => handleAction('lunas')}
             className="w-1/2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs shadow-md transition-all flex items-center justify-center space-x-1 cursor-pointer"
           >

@@ -10,12 +10,18 @@ import { FinancialReportView } from './components/FinancialReportView';
 import { AdminDashboard } from './components/AdminDashboard';
 import { MemberQrModal } from './components/MemberQrModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { SupabaseModal } from './components/SupabaseModal';
 import { AccessDeniedBanner } from './components/AccessDeniedBanner';
 import { LoginScreen } from './components/LoginScreen';
 import { Home, CreditCard, History, FileText, PlusCircle, Settings, QrCode, Coins, User } from 'lucide-react';
 
 function AppContent() {
-  const { currentUser, isAuthenticated } = useApp();
+  const {
+    currentUser,
+    isAuthenticated,
+    isSupabaseModalOpen,
+    setIsSupabaseModalOpen,
+  } = useApp();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [isPayModalOpen, setIsPayModalOpen] = useState<boolean>(false);
   const [payModalOption, setPayModalOption] = useState<PaymentDurationOption>('nominal_1000');
@@ -63,9 +69,9 @@ function AppContent() {
         {/* Render Tab based on activeTab & user role */}
         {activeTab === 'dashboard' && (
           currentUser.role === 'bendahara' ? (
-            <TreasurerDashboard setActiveTab={setActiveTab} />
+            <TreasurerDashboard setActiveTab={setActiveTab} initialSection="overview" />
           ) : currentUser.role === 'admin' ? (
-            <AdminDashboard />
+            <AdminDashboard initialTab="users" />
           ) : (
             <MemberDashboard
               onOpenPayModal={(opt = 'nominal_1000') => {
@@ -82,7 +88,7 @@ function AppContent() {
 
         {activeTab === 'pembayaran' && (
           isTreasurerOrAdmin ? (
-            <TreasurerDashboard setActiveTab={setActiveTab} />
+            <TreasurerDashboard setActiveTab={setActiveTab} initialSection="checklist" />
           ) : (
             <AccessDeniedBanner requiredRole="Bendahara" setActiveTab={setActiveTab} />
           )
@@ -100,7 +106,7 @@ function AppContent() {
 
         {activeTab === 'admin' && (
           isAdmin ? (
-            <AdminDashboard />
+            <AdminDashboard initialTab="class" />
           ) : (
             <AccessDeniedBanner requiredRole="Admin Sistem" setActiveTab={setActiveTab} />
           )
@@ -126,8 +132,9 @@ function AppContent() {
       {/* Mobile Bottom Navigation Bar */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 px-3 py-2 flex items-center justify-around shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
         <button
+          type="button"
           onClick={() => setActiveTab('dashboard')}
-          className={`flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider ${
+          className={`flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider cursor-pointer ${
             activeTab === 'dashboard' ? 'text-[#2563EB]' : 'text-slate-400'
           }`}
         >
@@ -138,6 +145,7 @@ function AppContent() {
         {currentUser.role === 'anggota' && (
           <>
             <button
+              type="button"
               onClick={() => {
                 setPayModalOption('nominal_1000');
                 setIsPayModalOpen(true);
@@ -151,6 +159,7 @@ function AppContent() {
             </button>
 
             <button
+              type="button"
               onClick={() => {
                 setPayModalOption('1_minggu');
                 setIsPayModalOpen(true);
@@ -164,8 +173,9 @@ function AppContent() {
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('riwayat')}
-              className={`flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider ${
+              className={`flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider cursor-pointer ${
                 activeTab === 'riwayat' ? 'text-[#2563EB]' : 'text-slate-400'
               }`}
             >
@@ -178,8 +188,9 @@ function AppContent() {
         {(currentUser.role === 'bendahara' || currentUser.role === 'admin') && (
           <>
             <button
+              type="button"
               onClick={() => setActiveTab('pembayaran')}
-              className={`flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider ${
+              className={`flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider cursor-pointer ${
                 activeTab === 'pembayaran' ? 'text-[#2563EB]' : 'text-slate-400'
               }`}
             >
@@ -188,8 +199,9 @@ function AppContent() {
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('pengeluaran')}
-              className={`flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider ${
+              className={`flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider cursor-pointer ${
                 activeTab === 'pengeluaran' ? 'text-[#2563EB]' : 'text-slate-400'
               }`}
             >
@@ -200,8 +212,9 @@ function AppContent() {
         )}
 
         <button
+          type="button"
           onClick={() => setActiveTab('laporan')}
-          className={`flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider ${
+          className={`flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider cursor-pointer ${
             activeTab === 'laporan' ? 'text-[#2563EB]' : 'text-slate-400'
           }`}
         >
@@ -211,6 +224,7 @@ function AppContent() {
 
         {/* Profil Mobile Bottom Button */}
         <button
+          type="button"
           onClick={() => setIsProfileModalOpen(true)}
           className="flex flex-col items-center space-y-0.5 text-[10px] font-black uppercase tracking-wider text-slate-400 hover:text-[#2563EB] cursor-pointer"
         >
@@ -229,6 +243,12 @@ function AppContent() {
       <UserProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
+      />
+
+      {/* Supabase Database Modal */}
+      <SupabaseModal
+        isOpen={isSupabaseModalOpen}
+        onClose={() => setIsSupabaseModalOpen(false)}
       />
     </div>
   );

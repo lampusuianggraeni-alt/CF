@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { User, Payment } from '../types';
+import { getTreasurerInfo } from '../lib/userRoles';
 import { X, Coins, CheckCircle2, UserCheck, Calendar, FileText, ArrowRight, Wallet, Plus, Minus, Receipt } from 'lucide-react';
 
 interface RecordCashPaymentModalProps {
@@ -17,24 +18,33 @@ export const RecordCashPaymentModal: React.FC<RecordCashPaymentModalProps> = ({
   onSuccess,
 }) => {
   const { currentUser, classGroup, users, payments, markPaidManual } = useApp();
+  const treasurerInfo = getTreasurerInfo(currentUser);
 
-  const memberUsers = users.filter((u) => u.role !== 'admin');
+  const memberUsers = users.filter((u) => u.role === 'anggota');
   const [selectedUserId, setSelectedUserId] = useState<string>(targetUser ? targetUser.id : (memberUsers[0]?.id || ''));
   const [amount, setAmount] = useState<number>(1000);
   const [customInputText, setCustomInputText] = useState<string>('1.000');
-  const [selectedMonth, setSelectedMonth] = useState<string>(classGroup.period || 'Maret 2025');
+  const [selectedMonth, setSelectedMonth] = useState<string>(classGroup.period || 'Agustus 2026');
   const [weekAllocation, setWeekAllocation] = useState<string>('cicilan');
   const [notes, setNotes] = useState<string>('');
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [recordedPayment, setRecordedPayment] = useState<Payment | null>(null);
 
-  // Sync when targetUser changes
+  // Sync when modal opens or targetUser changes
   useEffect(() => {
-    if (targetUser) {
-      setSelectedUserId(targetUser.id);
+    if (isOpen) {
+      setIsSubmitted(false);
+      setRecordedPayment(null);
+      setSelectedMonth(classGroup.period || 'Agustus 2026');
+      setNotes('');
+      if (targetUser) {
+        setSelectedUserId(targetUser.id);
+      } else if (!selectedUserId && memberUsers.length > 0) {
+        setSelectedUserId(memberUsers[0].id);
+      }
     }
-  }, [targetUser]);
+  }, [isOpen, targetUser, classGroup.period]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -92,14 +102,14 @@ export const RecordCashPaymentModal: React.FC<RecordCashPaymentModalProps> = ({
       weekPeriodLabel = `Cicilan Kas Rp ${amount.toLocaleString('id-ID')}`;
     }
 
-    const customNote = notes.trim() || `Setoran tunai diterima oleh Bendahara ${currentUser.name} (${weekPeriodLabel})`;
+    const customNote = notes.trim() || `Setoran tunai diterima oleh ${treasurerInfo.senderTitle} (${weekPeriodLabel})`;
 
-    const result = markPaidManual(activeUser.id, selectedMonth, amount, weekPeriodLabel, customNote);
+    const result = markPaidManual(activeUser.id, selectedMonth, amount, weekPeriodLabel, customNote, paymentDate);
     
     setIsSubmitted(true);
     if (result) {
-      setRecordedPayment(result as unknown as Payment);
-      if (onSuccess) onSuccess(result as unknown as Payment);
+      setRecordedPayment(result);
+      if (onSuccess) onSuccess(result);
     }
   };
 
@@ -167,7 +177,7 @@ export const RecordCashPaymentModal: React.FC<RecordCashPaymentModalProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Dicatat Oleh:</span>
-                <span className="font-semibold text-slate-800">{currentUser.name} (Bendahara)</span>
+                <span className="font-semibold text-slate-800">{treasurerInfo.senderTitle}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Status:</span>
@@ -391,12 +401,12 @@ export const RecordCashPaymentModal: React.FC<RecordCashPaymentModalProps> = ({
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                 >
-                  <option value="Maret 2025">Maret 2025</option>
-                  <option value="April 2025">April 2025</option>
-                  <option value="Mei 2025">Mei 2025</option>
-                  <option value="Juni 2025">Juni 2025</option>
-                  <option value="Juli 2025">Juli 2025</option>
-                  <option value="Agustus 2025">Agustus 2025</option>
+                  <option value={classGroup.period || 'Agustus 2026'}>{classGroup.period || 'Agustus 2026'} (Periode Aktif)</option>
+                  <option value="Juli 2026">Juli 2026</option>
+                  <option value="September 2026">September 2026</option>
+                  <option value="Oktober 2026">Oktober 2026</option>
+                  <option value="November 2026">November 2026</option>
+                  <option value="Desember 2026">Desember 2026</option>
                 </select>
               </div>
 

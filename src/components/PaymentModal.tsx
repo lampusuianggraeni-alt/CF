@@ -33,6 +33,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [copied, setCopied] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [lastTxn, setLastTxn] = useState<any>(null);
+  const proofInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -42,9 +43,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       if (defaultAmount) {
         setCustomAmount(defaultAmount);
       }
+      setSelectedMonth(classGroup.period || 'Agustus 2026');
+      setProofUrl('');
+      setNotes('');
+      setIsProcessing(false);
       setStep('amount');
     }
-  }, [isOpen, defaultOption, defaultAmount]);
+  }, [isOpen, defaultOption, defaultAmount, classGroup.period]);
+
+  const handleProofFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (typeof ev.target?.result === 'string') {
+        setProofUrl(ev.target.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -155,6 +172,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
           >
@@ -174,9 +192,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-[#2563EB] focus:outline-none uppercase tracking-wider"
               >
+                <option value="Juli 2026">Juli 2026</option>
                 <option value="Agustus 2026">Agustus 2026</option>
                 <option value="September 2026">September 2026</option>
-                <option value="Juli 2026">Juli 2026 (Tunggakan)</option>
+                <option value="Oktober 2026">Oktober 2026</option>
+                <option value="November 2026">November 2026</option>
+                <option value="Desember 2026">Desember 2026</option>
               </select>
             </div>
 
@@ -321,6 +342,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
 
             <button
+              type="button"
               onClick={() => setStep('method')}
               className="w-full py-4 bg-[#2563EB] hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-blue-200 transition-all flex items-center justify-center space-x-2 cursor-pointer"
             >
@@ -345,6 +367,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <div className="space-y-2.5">
               {/* QRIS */}
               <button
+                type="button"
                 onClick={() => setMethod('qris')}
                 className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                   method === 'qris'
@@ -368,6 +391,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
               {/* GoPay / ShopeePay / DANA */}
               <button
+                type="button"
                 onClick={() => setMethod('gopay')}
                 className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                   method === 'gopay' || method === 'shopeepay' || method === 'dana'
@@ -391,6 +415,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
               {/* Transfer Bank */}
               <button
+                type="button"
                 onClick={() => setMethod('transfer_bank')}
                 className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                   method === 'transfer_bank'
@@ -414,6 +439,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
               {/* Cash / Setor Manual */}
               <button
+                type="button"
                 onClick={() => setMethod('cash_manual')}
                 className={`w-full p-4 rounded-2xl border text-left flex items-center justify-between transition-all cursor-pointer ${
                   method === 'cash_manual'
@@ -435,12 +461,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             <div className="flex space-x-3 pt-2">
               <button
+                type="button"
                 onClick={() => setStep('amount')}
                 className="w-1/3 py-3 rounded-2xl bg-slate-100 text-slate-700 font-black text-xs uppercase tracking-wider hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 Kembali
               </button>
               <button
+                type="button"
                 onClick={() => setStep('process')}
                 className="w-2/3 py-3 bg-[#2563EB] hover:bg-blue-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-md shadow-blue-200 transition-all cursor-pointer"
               >
@@ -461,7 +489,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </p>
                 <div className="bg-slate-900 p-4 rounded-3xl inline-block shadow-lg border-4 border-white">
                   <img
-                    src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=KASKU-DIGITAL-12MIPA1-PAYMENT-RP6000"
+                    src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=KASKU-DIGITAL-IXACLASS-PAYMENT-RP6000"
                     alt="QRIS Code"
                     className="w-40 h-40 mx-auto rounded-xl"
                   />
@@ -483,6 +511,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       {classGroup.bankInfo.accountNumber}
                     </span>
                     <button
+                      type="button"
                       onClick={handleCopyAccount}
                       className="px-2.5 py-1 text-xs bg-blue-50 text-[#2563EB] hover:bg-blue-100 rounded-lg font-black flex items-center space-x-1 cursor-pointer"
                     >
@@ -495,13 +524,43 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                 <div className="space-y-2">
                   <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">
-                    Upload Foto Bukti Transfer (Simulasi)
+                    Upload Foto Bukti Transfer
                   </label>
-                  <div className="border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center hover:bg-slate-50 transition-colors cursor-pointer">
-                    <Upload className="w-7 h-7 text-[#2563EB] mx-auto mb-1" />
-                    <p className="text-xs font-black text-slate-800">Klik / Seret foto bukti transfer di sini</p>
-                    <p className="text-[10px] text-slate-400">Format JPG, PNG (Maks 5MB)</p>
-                  </div>
+                  <input
+                    ref={proofInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProofFileChange}
+                    className="hidden"
+                  />
+                  {proofUrl ? (
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 p-2 space-y-2">
+                      <img src={proofUrl} alt="Bukti Transfer" className="w-full h-36 object-cover rounded-xl" />
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-[11px] font-bold text-emerald-700 flex items-center space-x-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Foto bukti siap dikirim</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => proofInputRef.current?.click()}
+                          className="text-[11px] font-bold text-[#2563EB] hover:underline cursor-pointer"
+                        >
+                          Ganti Foto
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => proofInputRef.current?.click()}
+                      className="w-full border-2 border-dashed border-slate-300 rounded-2xl p-4 text-center hover:bg-slate-50 hover:border-[#2563EB] transition-colors cursor-pointer block"
+                    >
+                      <Upload className="w-7 h-7 text-[#2563EB] mx-auto mb-1" />
+                      <p className="text-xs font-black text-slate-800">Klik di sini untuk pilih foto bukti transfer</p>
+                      <p className="text-[10px] text-slate-400">Format JPG, PNG, WebP (Maks 5MB)</p>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -541,12 +600,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
             <div className="flex space-x-3 pt-2">
               <button
+                type="button"
                 onClick={() => setStep('method')}
                 className="w-1/3 py-3 rounded-2xl bg-slate-100 text-slate-700 font-black text-xs uppercase tracking-wider hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 Kembali
               </button>
               <button
+                type="button"
                 onClick={handleSimulatePayment}
                 disabled={isProcessing}
                 className="w-2/3 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
@@ -609,6 +670,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
 
             <button
+              type="button"
               onClick={() => {
                 onClose();
                 onSuccess();

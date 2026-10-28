@@ -1,11 +1,24 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { initialClassGroup, initialExpenses, initialNotifications, initialPayments, initialUsers } from '../data/mockData';
 import { ClassGroup, Expense, Notification, Payment, PaymentMethod, PaymentStatus, Role, User } from '../types';
+import { getTreasurerInfo } from '../lib/userRoles';
+import {
+  checkSupabaseHealth,
+  fetchAllFromSupabase,
+  pushAllToSupabase,
+  syncUserToSupabase,
+  deleteUserFromSupabase,
+  syncPaymentToSupabase,
+  syncExpenseToSupabase,
+  deleteExpenseFromSupabase,
+  syncClassGroupToSupabase,
+  SupabaseHealth,
+} from '../lib/supabase';
 
 interface AppContextType {
   currentUser: User;
   isAuthenticated: boolean;
-  login: (identifier: string, password?: string, googleEmail?: string) => { success: boolean; message: string; user?: User; requiresPasswordSetup?: boolean };
+  login: (identifier: string, password?: string, targetRole?: Role, googleEmail?: string) => { success: boolean; message: string; user?: User; requiresPasswordSetup?: boolean };
   loginWithGoogle: (googleEmail: string) => { success: boolean; message: string; user?: User; requiresPasswordSetup?: boolean };
   setSelfPassword: (userId: string, newPassword: string) => { success: boolean; message: string };
   resetPasswordWithGoogle: (googleEmail: string, newPassword: string) => { success: boolean; message: string };
@@ -23,7 +36,7 @@ interface AppContextType {
   payments: Payment[];
   addPayment: (payment: Omit<Payment, 'id' | 'transactionId'>) => Payment;
   verifyPayment: (paymentId: string, status: PaymentStatus, notes?: string) => void;
-  markPaidManual: (userId: string, monthPeriod: string, amount: number, weekPeriod?: string) => void;
+  markPaidManual: (userId: string, monthPeriod: string, amount: number, weekPeriod?: string, customNote?: string, paymentDate?: string) => Payment | undefined;
   expenses: Expense[];
   addExpense: (expense: Omit<Expense, 'id'>) => void;
   updateExpense: (id: string, updated: Partial<Expense>) => void;
@@ -33,6 +46,13 @@ interface AppContextType {
   markAllNotificationsRead: () => void;
   sendReminder: (userId: string | 'all', title?: string, message?: string) => void;
   resetDemoData: () => void;
+  // Supabase Database Integration
+  supabaseHealth: SupabaseHealth | null;
+  isSupabaseModalOpen: boolean;
+  setIsSupabaseModalOpen: (open: boolean) => void;
+  syncAllFromSupabase: () => Promise<{ success: boolean; message: string }>;
+  syncAllToSupabase: () => Promise<{ success: boolean; message: string }>;
+  refreshSupabaseHealth: () => Promise<void>;
   // Computed Stats
   totalBalance: number;
   totalIncomeThisMonth: number;
@@ -44,12 +64,25 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'kasku_digital_state_v5';
+const STORAGE_KEY = 'kasku_digital_state_v13';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [users, setUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_users`);
-    return saved ? JSON.parse(saved) : initialUsers;
+    if (saved) {
+      try {
+        const parsed: User[] = JSON.parse(saved);
+        const hasMaita = parsed.some((u) => (u.nisn === '3124652885' || u.username === 'maita') && u.role === 'bendahara');
+        const hasFioren = parsed.some((u) => (u.nisn === '0123428941' || u.username === 'fioren') && u.role === 'bendahara');
+        const hasAdmin = parsed.some((u) => u.role === 'admin' && (u.username === 'admin' || u.name.includes('Lampu')));
+        if (hasMaita && hasFioren && hasAdmin) {
+          return parsed;
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+    return initialUsers;
   });
 
   const [currentUser, setCurrentUser] = useState<User>(() => {
@@ -63,13 +96,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     const savedAuth = localStorage.getItem(`${STORAGE_KEY}_is_auth`);
-    // Default to true for smooth initial load, but can be logged out cleanly
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const portal = (params.get('portal') || params.get('role') || params.get('mode') || '').toLowerCase();
+      if (portal === 'siswa') {
+        if (savedAuth !== 'true' || currentUser.role !== 'anggota') {
+          return false;
+        }
+      } else if (portal === 'admin') {
+        if (savedAuth !== 'true' || currentUser.role !== 'admin') {
+          return false;
+        }
+      } else if (portal === 'bendahara' || portal === 'pengurus') {
+        if (savedAuth !== 'true' || currentUser.role !== 'bendahara') {
+          return false;
+        }
+      }
+    }
     return savedAuth !== null ? savedAuth === 'true' : true;
   });
 
+  // Re-check portal access if user or URL changes to prevent session collisions
+  useEffect(() => {
+    const checkPortalSession = () => {
+      if (typeof window === 'undefined') return;
+      const params = new URLSearchParams(window.location.search);
+      const portal = (params.get('portal') || params.get('role') || params.get('mode') || '').toLowerCase();
+      if (portal === 'admin' && currentUser.role !== 'admin') {
+        setIsAuthenticated(false);
+      } else if (portal === 'bendahara' && currentUser.role !== 'bendahara') {
+        setIsAuthenticated(false);
+      } else if (portal === 'siswa' && currentUser.role !== 'anggota') {
+        setIsAuthenticated(false);
+      }
+    };
+    checkPortalSession();
+    window.addEventListener('popstate', checkPortalSession);
+    return () => window.removeEventListener('popstate', checkPortalSession);
+  }, [currentUser]);
+
   const [classGroup, setClassGroup] = useState<ClassGroup>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_class`);
-    return saved ? JSON.parse(saved) : initialClassGroup;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // fallback
+      }
+    }
+    return initialClassGroup;
   });
 
   const [payments, setPayments] = useState<Payment[]>(() => {
@@ -86,6 +161,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem(`${STORAGE_KEY}_notifications`);
     return saved ? JSON.parse(saved) : initialNotifications;
   });
+
+  // Supabase states & health status
+  const [supabaseHealth, setSupabaseHealth] = useState<SupabaseHealth | null>(null);
+  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
+
+  const refreshSupabaseHealth = async () => {
+    try {
+      const res = await checkSupabaseHealth();
+      setSupabaseHealth(res);
+    } catch {
+      // ignore
+    }
+  };
+
+  // Attempt initial sync on load if Supabase has tables & data
+  useEffect(() => {
+    refreshSupabaseHealth().then(async () => {
+      try {
+        const remote = await fetchAllFromSupabase();
+        if (remote.success && remote.users && remote.users.length > 0) {
+          const remoteIds = new Set(remote.users.map((u) => u.id));
+          const remoteNisns = new Set(remote.users.map((u) => u.nisn));
+          const missingInitialUsers = initialUsers.filter(
+            (u) => !remoteIds.has(u.id) && (!u.nisn || !remoteNisns.has(u.nisn))
+          );
+          const mergedUsers = [...remote.users, ...missingInitialUsers];
+          setUsers(mergedUsers);
+          if (missingInitialUsers.length > 0) {
+            pushAllToSupabase({
+              users: mergedUsers,
+              classGroup: remote.classGroup || classGroup,
+              payments: remote.payments || payments,
+              expenses: remote.expenses || expenses,
+              notifications: remote.notifications || notifications,
+            }).catch(() => {});
+          }
+          if (remote.classGroup) setClassGroup(remote.classGroup);
+          if (remote.payments) setPayments(remote.payments);
+          if (remote.expenses) setExpenses(remote.expenses);
+          if (remote.notifications) setNotifications(remote.notifications);
+        }
+      } catch {
+        // Fallback to local data
+      }
+    });
+  }, []);
+
+  const syncAllFromSupabase = async () => {
+    const res = await fetchAllFromSupabase();
+    if (res.success) {
+      if (res.users && res.users.length > 0) setUsers(res.users);
+      if (res.classGroup) setClassGroup(res.classGroup);
+      if (res.payments) setPayments(res.payments);
+      if (res.expenses) setExpenses(res.expenses);
+      if (res.notifications) setNotifications(res.notifications);
+    }
+    return res;
+  };
+
+  const syncAllToSupabase = async () => {
+    const res = await pushAllToSupabase({
+      users,
+      classGroup,
+      payments,
+      expenses,
+      notifications,
+    });
+    return res;
+  };
 
   // Sync to localStorage
   useEffect(() => {
@@ -113,73 +257,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(`${STORAGE_KEY}_notifications`, JSON.stringify(notifications));
   }, [notifications]);
 
-  // Login handler with Google Email & Password support
+  // Login handler with NISN & Password support
   const login = (
     identifier: string,
     password?: string,
+    targetRole?: Role,
     googleEmail?: string
   ): { success: boolean; message: string; user?: User; requiresPasswordSetup?: boolean } => {
     const cleanId = identifier.trim().toLowerCase();
     const cleanPass = password ? password.trim() : '';
-    const cleanGoogle = googleEmail ? googleEmail.trim().toLowerCase() : '';
 
-    if (!cleanId && !cleanGoogle) {
-      return { success: false, message: 'Harap masukkan Email Google Anda untuk mengakses aplikasi.' };
+    if (!cleanId) {
+      return { success: false, message: 'Harap masukkan NISN Anda untuk mengakses aplikasi.' };
     }
 
-    // Match by Google email, email, username, or NISN
-    const matchedUser = users.find((u) => {
-      const matchGoogle = cleanGoogle && (u.googleEmail?.toLowerCase() === cleanGoogle || u.email?.toLowerCase() === cleanGoogle);
-      const matchUsername = u.username?.toLowerCase() === cleanId;
-      const matchEmail = u.email?.toLowerCase() === cleanId;
-      const matchNisn = u.nisn?.toLowerCase() === cleanId;
-      const matchDirectGoogle = u.googleEmail?.toLowerCase() === cleanId;
-      return matchGoogle || matchUsername || matchEmail || matchNisn || matchDirectGoogle;
-    });
+    // Match by NISN, username, email, or name (prioritizing targetRole if specified)
+    const checkUserMatch = (u: User) => {
+      const cleanRawId = cleanId.replace(/\s+/g, '');
+      const userNisnClean = (u.nisn || '').toLowerCase().replace(/\s+/g, '');
+      const userUsernameClean = (u.username || '').toLowerCase().replace(/\s+/g, '');
+      const userEmailClean = (u.email || '').toLowerCase().trim();
+
+      const matchNisn = userNisnClean === cleanRawId;
+      const matchUsername = userUsernameClean === cleanRawId;
+      const matchEmail = userEmailClean === cleanId;
+
+      const uNameClean = (u.name || '').toLowerCase().replace(/[.,]/g, '').trim();
+      const searchNameClean = cleanId.replace(/[.,]/g, '').trim();
+      const matchName =
+        uNameClean === searchNameClean ||
+        (searchNameClean.length >= 3 && uNameClean.includes(searchNameClean)) ||
+        (uNameClean.length >= 3 && searchNameClean.includes(uNameClean));
+
+      const matchBendaharaAlias = (cleanId === 'bnd-ixa-01' || cleanId === '0061234502' || cleanId === 'bendahara') && u.role === 'bendahara';
+      const matchAdminAlias = (cleanId === '0061234501' || cleanId === 'admin') && u.role === 'admin';
+      return matchNisn || matchUsername || matchEmail || matchName || matchBendaharaAlias || matchAdminAlias;
+    };
+
+    let matchedUser = targetRole ? users.find((u) => u.role === targetRole && checkUserMatch(u)) : undefined;
+    if (!matchedUser) {
+      matchedUser = users.find(checkUserMatch);
+    }
 
     if (!matchedUser) {
-      // If user provided a valid Google email (e.g. lampusuianggraeni@gmail.com or other @gmail.com)
-      const isGmail = (cleanGoogle || cleanId).includes('@gmail.com') || (cleanGoogle || cleanId).includes('@');
-      if (isGmail) {
-        // Link to first student user if not yet registered
-        const targetStudent = users.find((u) => u.role === 'anggota') || users[0];
-        if (targetStudent) {
-          const updatedStudent: User = {
-            ...targetStudent,
-            googleEmail: cleanGoogle || cleanId,
-            email: cleanGoogle || cleanId,
-          };
-          setUsers((prev) => prev.map((u) => (u.id === targetStudent.id ? updatedStudent : u)));
-          setCurrentUser(updatedStudent);
-          setIsAuthenticated(true);
-          return {
-            success: true,
-            message: `Akun Google "${cleanGoogle || cleanId}" berhasil terhubung ke ${updatedStudent.name}. Silakan atur kata sandi pribadi Anda!`,
-            user: updatedStudent,
-            requiresPasswordSetup: !updatedStudent.hasCustomPassword,
-          };
-        }
-      }
-
       return {
         success: false,
-        message: 'Akun atau Email Google tidak ditemukan. Masukkan email Google yang terdaftar atau pilih siswa.',
+        message: 'NISN atau nama siswa tidak ditemukan dalam daftar kelas. Silakan pilih nama Anda langsung dari daftar siswa di atas.',
       };
     }
 
-    // If password provided, verify it
-    if (cleanPass) {
-      const expectedPass = matchedUser.password || 'kas12345';
-      if (expectedPass !== cleanPass) {
-        return {
-          success: false,
-          message: 'Kata sandi salah. Anda dapat mengatur ulang kata sandi menggunakan Email Google Anda.',
-        };
-      }
-    } else if (matchedUser.hasCustomPassword) {
+    // Verify password - Password is strictly required (no login without password!)
+    if (!cleanPass) {
       return {
         success: false,
-        message: 'Akun ini memiliki kata sandi pribadi. Silakan masukkan kata sandi Anda.',
+        message: 'Harap masukkan kata sandi Anda untuk masuk ke aplikasi.',
+      };
+    }
+
+    const isStaffUser = matchedUser.role === 'admin' || matchedUser.role === 'bendahara';
+    const expectedPass = matchedUser.password || (isStaffUser ? 'admin123' : 'kas12345');
+    const staffAccepted = isStaffUser && (cleanPass === 'admin123' || cleanPass === 'bendahara123' || cleanPass === 'kas12345');
+    const studentAccepted = !isStaffUser && (cleanPass === 'kas12345' || cleanPass === expectedPass);
+    if (expectedPass !== cleanPass && !staffAccepted && !studentAccepted) {
+      return {
+        success: false,
+        message: 'Kata sandi salah. Gunakan sandi bawaan "kas12345" atau kata sandi pribadi yang telah diatur.',
       };
     }
 
@@ -189,55 +331,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return {
       success: true,
       message: `Selamat datang kembali, ${matchedUser.name}! Anda berhasil masuk sebagai ${
-        matchedUser.role === 'admin' ? 'Administrator' : matchedUser.role === 'bendahara' ? 'Bendahara Utama' : 'Anggota Kelas'
+        matchedUser.role === 'admin' ? 'Administrator' : matchedUser.role === 'bendahara' ? 'Bendahara Kelas' : 'Anggota Kelas'
       }.`,
       user: matchedUser,
       requiresPasswordSetup: !matchedUser.hasCustomPassword,
     };
   };
 
-  // Login via Google One-Tap / Google Account
+  // Kept for backward compatibility if referenced
   const loginWithGoogle = (
-    googleEmail: string
+    nisnOrId: string
   ): { success: boolean; message: string; user?: User; requiresPasswordSetup?: boolean } => {
-    const cleanEmail = googleEmail.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      return { success: false, message: 'Harap masukkan alamat Email Google (Gmail) yang valid.' };
-    }
-
-    let matchedUser = users.find(
-      (u) =>
-        u.googleEmail?.toLowerCase() === cleanEmail ||
-        u.email?.toLowerCase() === cleanEmail ||
-        u.username?.toLowerCase() === cleanEmail.split('@')[0]
-    );
-
-    // If not found, bind to student usr-1 or create friendly student profile
-    if (!matchedUser) {
-      const defaultAnggota = users.find((u) => u.id === 'usr-1') || users.find((u) => u.role === 'anggota');
-      if (defaultAnggota) {
-        matchedUser = {
-          ...defaultAnggota,
-          googleEmail: cleanEmail,
-          email: cleanEmail,
-        };
-        setUsers((prev) => prev.map((u) => (u.id === defaultAnggota.id ? matchedUser! : u)));
-      }
-    }
-
-    if (!matchedUser) {
-      return { success: false, message: 'Tidak dapat mengautentikasi akun Google.' };
-    }
-
-    setCurrentUser(matchedUser);
-    setIsAuthenticated(true);
-
-    return {
-      success: true,
-      message: `Berhasil masuk dengan akun Google: ${cleanEmail}. Selamat datang, ${matchedUser.name}!`,
-      user: matchedUser,
-      requiresPasswordSetup: !matchedUser.hasCustomPassword,
-    };
+    return login(nisnOrId);
   };
 
   // Self-service: Anggota mengatur sandi sendiri
@@ -252,13 +357,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Pengguna tidak ditemukan.' };
     }
 
+    const updatedUser = { ...target, password: cleanPass, hasCustomPassword: true };
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, password: cleanPass, hasCustomPassword: true } : u))
+      prev.map((u) => (u.id === userId ? updatedUser : u))
     );
 
     if (currentUser.id === userId) {
       setCurrentUser((prev) => ({ ...prev, password: cleanPass, hasCustomPassword: true }));
     }
+
+    // Sync to Supabase in background
+    syncUserToSupabase(updatedUser);
 
     const secNotif: Notification = {
       id: `notif-${Date.now()}`,
@@ -277,13 +386,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  // Reset kata sandi mandiri menggunakan Email Google
-  const resetPasswordWithGoogle = (googleEmail: string, newPassword: string): { success: boolean; message: string } => {
-    const cleanEmail = googleEmail.trim().toLowerCase();
+  // Reset kata sandi mandiri menggunakan NISN
+  const resetPasswordWithGoogle = (nisnInput: string, newPassword: string): { success: boolean; message: string } => {
+    const cleanNisn = nisnInput.trim().toLowerCase();
     const cleanPass = newPassword.trim();
 
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      return { success: false, message: 'Harap masukkan Email Google yang valid.' };
+    if (!cleanNisn) {
+      return { success: false, message: 'Harap masukkan NISN yang valid.' };
     }
     if (!cleanPass || cleanPass.length < 4) {
       return { success: false, message: 'Kata sandi baru minimal harus 4 karakter.' };
@@ -291,28 +400,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const target = users.find(
       (u) =>
-        u.googleEmail?.toLowerCase() === cleanEmail ||
-        u.email?.toLowerCase() === cleanEmail
+        u.nisn?.toLowerCase() === cleanNisn ||
+        u.username?.toLowerCase() === cleanNisn
     );
 
     if (!target) {
       return {
         success: false,
-        message: `Email Google "${cleanEmail}" belum terdaftar. Pastikan email Google Anda cocok dengan profil siswa.`,
+        message: `NISN "${nisnInput}" belum terdaftar. Pastikan NISN Anda cocok dengan profil yang didaftarkan Admin.`,
       };
     }
 
+    const updatedTarget = { ...target, password: cleanPass, hasCustomPassword: true };
     setUsers((prev) =>
-      prev.map((u) => (u.id === target.id ? { ...u, password: cleanPass, hasCustomPassword: true } : u))
+      prev.map((u) => (u.id === target.id ? updatedTarget : u))
     );
 
     if (currentUser.id === target.id) {
       setCurrentUser((prev) => ({ ...prev, password: cleanPass, hasCustomPassword: true }));
     }
 
+    // Sync to Supabase in background
+    syncUserToSupabase(updatedTarget);
+
     return {
       success: true,
-      message: `Kata sandi untuk ${target.name} berhasil diatur ulang via Email Google! Silakan masuk dengan sandi baru Anda.`,
+      message: `Kata sandi untuk ${target.name} (NISN: ${target.nisn}) berhasil diatur ulang! Silakan masuk dengan sandi baru Anda.`,
     };
   };
 
@@ -323,12 +436,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, message: 'Alamat Email Google tidak valid.' };
     }
 
+    const targetUser = users.find((u) => u.id === userId);
+    const updatedUser = targetUser
+      ? { ...targetUser, googleEmail: cleanEmail, email: cleanEmail }
+      : null;
+
     setUsers((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, googleEmail: cleanEmail, email: cleanEmail } : u))
     );
 
     if (currentUser.id === userId) {
       setCurrentUser((prev) => ({ ...prev, googleEmail: cleanEmail, email: cleanEmail }));
+    }
+
+    if (updatedUser) {
+      syncUserToSupabase(updatedUser);
     }
 
     return {
@@ -338,6 +460,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logout = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get('portal')) {
+        const nextPortal = currentUser.role === 'anggota' ? 'siswa' : 'pengurus';
+        window.history.replaceState(null, '', `?portal=${nextPortal}`);
+      }
+    }
     setIsAuthenticated(false);
   };
 
@@ -359,7 +488,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateClassGroup = (updated: Partial<ClassGroup>) => {
-    setClassGroup((prev) => ({ ...prev, ...updated }));
+    setClassGroup((prev) => {
+      const next = { ...prev, ...updated };
+      syncClassGroupToSupabase(next);
+      return next;
+    });
   };
 
   // Role Enforcement: Only Admin can add users
@@ -388,6 +521,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setUsers((prev) => [...prev, userWithId]);
+    syncUserToSupabase(userWithId);
 
     const newNotif: Notification = {
       id: `notif-${Date.now()}`,
@@ -409,27 +543,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateUser = (id: string, updated: Partial<User>) => {
     const existingUser = users.find((u) => u.id === id);
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...updated } : u)));
-    
-    if (currentUser.id === id) {
-      setCurrentUser((prev) => ({ ...prev, ...updated }));
+    const safeUpdated: Partial<User> = { ...updated };
+
+    // Only Admin can modify name, nisn, or role
+    if (currentUser.role !== 'admin') {
+      delete safeUpdated.name;
+      delete safeUpdated.nisn;
+      delete safeUpdated.role;
     }
 
-    // If name is updated, sync payment history name & treasurer name
-    if (updated.name && existingUser && updated.name !== existingUser.name) {
+    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...safeUpdated } : u)));
+    
+    if (currentUser.id === id) {
+      setCurrentUser((prev) => ({ ...prev, ...safeUpdated }));
+    }
+
+    if (existingUser) {
+      syncUserToSupabase({ ...existingUser, ...safeUpdated });
+    }
+
+    // If name is updated by Admin, sync payment history name & treasurer name
+    if (safeUpdated.name && existingUser && safeUpdated.name !== existingUser.name) {
       setPayments((prev) =>
-        prev.map((p) => (p.userId === id ? { ...p, userName: updated.name! } : p))
+        prev.map((p) => (p.userId === id ? { ...p, userName: safeUpdated.name! } : p))
       );
 
       if (existingUser.role === 'bendahara' && classGroup.treasurerName === existingUser.name) {
-        setClassGroup((prev) => ({ ...prev, treasurerName: updated.name! }));
+        setClassGroup((prev) => ({ ...prev, treasurerName: safeUpdated.name! }));
       }
 
       const newNotif: Notification = {
         id: `notif-${Date.now()}`,
         userId: id,
         title: 'Nama Profil Diperbarui ✏️',
-        message: `Nama profil berhasil diubah dari "${existingUser.name}" menjadi "${updated.name}".`,
+        message: `Nama profil berhasil diubah dari "${existingUser.name}" menjadi "${safeUpdated.name}".`,
         isRead: false,
         createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
         type: 'verification',
@@ -471,10 +618,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, password: cleanPass } : u)));
+    const updatedTargetUser = { ...targetUser, password: cleanPass };
+    setUsers((prev) => prev.map((u) => (u.id === id ? updatedTargetUser : u)));
     if (currentUser.id === id) {
       setCurrentUser((prev) => ({ ...prev, password: cleanPass }));
     }
+
+    syncUserToSupabase(updatedTargetUser);
 
     // Add private security notification to target user
     const secNotif: Notification = {
@@ -519,6 +669,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Remove user
     const remainingUsers = users.filter((u) => u.id !== id);
     setUsers(remainingUsers);
+    deleteUserFromSupabase(id);
 
     // If current active user is deleted, fallback to admin
     if (currentUser.id === id) {
@@ -561,6 +712,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setPayments((prev) => [newPayment, ...prev]);
+    syncPaymentToSupabase(newPayment);
 
     // Create Notification
     const notifTitle = newPayment.status === 'lunas' 
@@ -586,6 +738,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const verifyPayment = (paymentId: string, status: PaymentStatus, notes?: string) => {
     let targetPayment: Payment | undefined;
+    const treasurerInfo = getTreasurerInfo(currentUser);
+    const verifierLabel = treasurerInfo.isTreasurer
+      ? treasurerInfo.senderTitle
+      : currentUser.role === 'admin'
+      ? `Administrator (${currentUser.name})`
+      : currentUser.name;
 
     setPayments((prev) =>
       prev.map((p) => {
@@ -595,7 +753,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             status,
             notes: notes || p.notes,
             verifiedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-            verifiedBy: currentUser.name,
+            verifiedBy: verifierLabel,
           };
           return targetPayment;
         }
@@ -604,59 +762,93 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (targetPayment) {
+      syncPaymentToSupabase(targetPayment);
       const isApproved = status === 'lunas';
       const newNotif: Notification = {
         id: `notif-${Date.now()}`,
         userId: targetPayment.userId,
         title: isApproved ? 'Pembayaran Diverifikasi LUNAS ✅' : 'Verifikasi Pembayaran Ditolak ❌',
         message: isApproved
-          ? `Pembayaran kas periode ${targetPayment.monthPeriod} kamu telah disetujui oleh Bendahara ${currentUser.name}.`
-          : `Pembayaran kas periode ${targetPayment.monthPeriod} ditolak. Catatan Bendahara: ${notes || 'Bukti kurang jelas'}.`,
+          ? `Pembayaran kas periode ${targetPayment.monthPeriod} kamu telah disetujui & diverifikasi LUNAS oleh ${verifierLabel}.`
+          : `Pembayaran kas periode ${targetPayment.monthPeriod} ditolak oleh ${verifierLabel}. Catatan: ${notes || 'Bukti kurang jelas'}.`,
         isRead: false,
         createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
         type: isApproved ? 'payment_success' : 'reminder',
+        senderName: verifierLabel,
+        senderRole: treasurerInfo.shortLabel,
+        senderId: currentUser.id,
       };
       setNotifications((prev) => [newNotif, ...prev]);
     }
   };
 
-  const markPaidManual = (userId: string, monthPeriod: string, amount: number, weekPeriod?: string) => {
+  const markPaidManual = (
+    userId: string,
+    monthPeriod: string,
+    amount: number,
+    weekPeriod?: string,
+    customNote?: string,
+    paymentDate?: string
+  ): Payment | undefined => {
     const userObj = users.find((u) => u.id === userId);
-    if (!userObj) return;
+    if (!userObj) return undefined;
 
-    addPayment({
+    const treasurerInfo = getTreasurerInfo(currentUser);
+    const verifierLabel = treasurerInfo.isTreasurer
+      ? treasurerInfo.senderTitle
+      : currentUser.role === 'admin'
+      ? `Administrator (${currentUser.name})`
+      : currentUser.name;
+
+    return addPayment({
       userId,
       userName: userObj.name,
       amount,
-      date: new Date().toISOString().split('T')[0],
+      date: paymentDate || new Date().toISOString().split('T')[0],
       monthPeriod,
       weekPeriod: weekPeriod || (amount === classGroup.weeklyDues ? 'Minggu 1' : '1 Bulan Penuh (Minggu 1 - 4)'),
       method: 'cash_manual',
       status: 'lunas',
-      notes: `Setor tunai dicatat oleh Bendahara (${weekPeriod || 'Lunas'})`,
+      notes: customNote || `Setor tunai diterima langsung oleh ${verifierLabel} (${weekPeriod || 'Lunas'})`,
       verifiedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      verifiedBy: currentUser.name,
+      verifiedBy: verifierLabel,
     });
   };
 
   // Expense Handlers
   const addExpense = (expenseData: Omit<Expense, 'id'>) => {
+    const treasurerInfo = getTreasurerInfo(currentUser);
+    const recorderLabel = treasurerInfo.isTreasurer
+      ? treasurerInfo.senderTitle
+      : currentUser.role === 'admin'
+      ? `Administrator (${currentUser.name})`
+      : currentUser.name;
+
     const newExpense: Expense = {
       ...expenseData,
       id: `exp-${Date.now()}`,
-      recordedBy: currentUser.name,
+      recordedBy: expenseData.recordedBy || recorderLabel,
     };
     setExpenses((prev) => [newExpense, ...prev]);
+    syncExpenseToSupabase(newExpense);
   };
 
   const updateExpense = (id: string, updated: Partial<Expense>) => {
     setExpenses((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, ...updated } : e))
+      prev.map((e) => {
+        if (e.id === id) {
+          const next = { ...e, ...updated };
+          syncExpenseToSupabase(next);
+          return next;
+        }
+        return e;
+      })
     );
   };
 
   const deleteExpense = (id: string) => {
     setExpenses((prev) => prev.filter((e) => e.id !== id));
+    deleteExpenseFromSupabase(id);
   };
 
   // Notifications
@@ -669,8 +861,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const sendReminder = (targetUserId: string | 'all', title?: string, message?: string) => {
-    const defaultTitle = 'Pengingat Uang Kas (Rp 6.000/mg) ⚠️';
-    const defaultMsg = `Halo! Diingatkan untuk membayar kas kelas ${classGroup.period} (Rp 6.000 / minggu atau Rp 24.000 / bulan).`;
+    const treasurerInfo = getTreasurerInfo(currentUser);
+    const senderTitle = treasurerInfo.isTreasurer
+      ? treasurerInfo.senderTitle
+      : currentUser.role === 'admin'
+      ? `Administrator (${currentUser.name})`
+      : `Pengurus (${currentUser.name})`;
+
+    const senderRole = treasurerInfo.isTreasurer
+      ? treasurerInfo.shortLabel
+      : currentUser.role === 'admin'
+      ? 'Administrator'
+      : 'Anggota';
+
+    const defaultTitle = `Pengingat Kas dari ${senderRole} (${treasurerInfo.callName}) ⚠️`;
+    const defaultMsg = `Halo! Anda diingatkan langsung oleh ${senderTitle} untuk segera melunasi iuran kas kelas ${classGroup.period} (Rp 6.000 / minggu atau Rp 24.000 / bulan). Silakan bayar melalui aplikasi atau serahkan langsung ke ${treasurerInfo.callName}.`;
 
     if (targetUserId === 'all') {
       const unpaidMembers = users.filter((u) => {
@@ -689,6 +894,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isRead: false,
         createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
         type: 'reminder',
+        senderName: senderTitle,
+        senderRole: senderRole,
+        senderId: currentUser.id,
       }));
 
       setNotifications((prev) => [...newNotifs, ...prev]);
@@ -701,6 +909,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isRead: false,
         createdAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
         type: 'reminder',
+        senderName: senderTitle,
+        senderRole: senderRole,
+        senderId: currentUser.id,
       };
       setNotifications((prev) => [newNotif, ...prev]);
     }
@@ -708,14 +919,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Reset Demo Data
   const resetDemoData = () => {
+    const adminUser = initialUsers.find((u) => u.role === 'admin') || initialUsers[0];
     setUsers(initialUsers);
-    setCurrentUser(initialUsers[2]); // Default to admin for full visibility after reset
+    setCurrentUser(adminUser);
     setIsAuthenticated(true);
     setClassGroup(initialClassGroup);
     setPayments(initialPayments);
     setExpenses(initialExpenses);
     setNotifications(initialNotifications);
     localStorage.clear();
+    pushAllToSupabase({
+      users: initialUsers,
+      classGroup: initialClassGroup,
+      payments: initialPayments,
+      expenses: initialExpenses,
+      notifications: initialNotifications,
+    }).catch(() => {});
   };
 
   // Computed Financial Metrics
@@ -732,11 +951,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const totalIncomeThisMonth = currentMonthPayments.reduce((sum, p) => sum + p.amount, 0);
 
+  const currentYearMonth = new Date().toISOString().slice(0, 7);
   const totalExpenseThisMonth = expenses
-    .filter((e) => e.date.startsWith('2026-08'))
+    .filter((e) => e.date.startsWith('2026-08') || e.date.startsWith(currentYearMonth))
     .reduce((sum, e) => sum + e.amount, 0);
 
-  const memberUsers = users.filter((u) => u.role !== 'admin');
+  const memberUsers = users.filter((u) => u.role === 'anggota');
   const paidMembersCount = currentMonthPayments.length;
   const pendingVerificationCount = payments.filter(
     (p) => p.monthPeriod === classGroup.period && p.status === 'menunggu'
@@ -776,6 +996,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         markAllNotificationsRead,
         sendReminder,
         resetDemoData,
+        // Supabase values
+        supabaseHealth,
+        isSupabaseModalOpen,
+        setIsSupabaseModalOpen,
+        syncAllFromSupabase,
+        syncAllToSupabase,
+        refreshSupabaseHealth,
+        // Metrics
         totalBalance,
         totalIncomeThisMonth,
         totalExpenseThisMonth,

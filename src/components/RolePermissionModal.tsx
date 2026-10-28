@@ -90,7 +90,7 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({ isOpen
             </div>
 
             <div className="mt-3 p-2.5 bg-purple-100/60 rounded-xl text-[11px] font-semibold text-purple-900">
-              Kredensial Demo: <code className="font-mono bg-white px-1.5 py-0.5 rounded">admin</code> / <code className="font-mono bg-white px-1.5 py-0.5 rounded">admin123</code>
+              NISN Admin: <code className="font-mono bg-white px-1.5 py-0.5 rounded">0061234501</code> / Sandi: <code className="font-mono bg-white px-1.5 py-0.5 rounded">admin123</code>
             </div>
           </div>
 
@@ -141,7 +141,7 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({ isOpen
             </div>
 
             <div className="mt-3 p-2.5 bg-blue-100/60 rounded-xl text-[11px] font-semibold text-blue-900">
-              Kredensial Demo: <code className="font-mono bg-white px-1.5 py-0.5 rounded">bendahara</code> / <code className="font-mono bg-white px-1.5 py-0.5 rounded">bendahara123</code>
+              NISN Bendahara: <code className="font-mono bg-white px-1.5 py-0.5 rounded">BND-IXA-01</code> / Sandi: <code className="font-mono bg-white px-1.5 py-0.5 rounded">bendahara123</code>
             </div>
           </div>
 
@@ -150,7 +150,7 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({ isOpen
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="px-3 py-1 rounded-full bg-emerald-700 text-white text-xs font-black uppercase tracking-wider">
-                  🎓 3. Anggota (32 Siswa)
+                  🎓 3. Anggota Siswa
                 </span>
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
                   Siswa
@@ -181,7 +181,7 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({ isOpen
             </div>
 
             <div className="mt-3 p-2.5 bg-emerald-100/60 rounded-xl text-[11px] font-semibold text-emerald-900">
-              Kredensial Demo: <code className="font-mono bg-white px-1.5 py-0.5 rounded">anggota01</code> / <code className="font-mono bg-white px-1.5 py-0.5 rounded">kas12345</code>
+              Akun Siswa: Didaftarkan oleh Administrator melalui Dashboard Admin.
             </div>
           </div>
         </div>

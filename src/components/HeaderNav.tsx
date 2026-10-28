@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Role } from '../types';
-import { Bell, CheckCircle, ShieldCheck, UserCheck, Users, QrCode, RefreshCw, Sparkles, ChevronDown, ShieldAlert, Info, Camera, Edit3, LogOut, KeyRound, Coins } from 'lucide-react';
+import { Bell, CheckCircle, ShieldCheck, UserCheck, Users, QrCode, RefreshCw, Sparkles, ChevronDown, ShieldAlert, Info, Camera, Edit3, LogOut, KeyRound, Coins, Database, Link as LinkIcon, GraduationCap } from 'lucide-react';
 import { RolePermissionModal } from './RolePermissionModal';
 import { ProfilePhotoModal } from './ProfilePhotoModal';
 import { EditNameModal } from './EditNameModal';
 import { UserProfileModal } from './UserProfileModal';
 import { SelfPasswordModal } from './SelfPasswordModal';
+import { PortalLinksModal } from './PortalLinksModal';
 import { PaymentDurationOption } from './PaymentModal';
+import { getTreasurerInfo } from '../lib/userRoles';
 
 interface HeaderNavProps {
   activeTab: string;
@@ -17,7 +19,20 @@ interface HeaderNavProps {
 }
 
 export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, onOpenQrModal, onOpenPayModal }) => {
-  const { currentUser, switchRole, switchUser, users, notifications, markNotificationRead, markAllNotificationsRead, resetDemoData, classGroup, logout } = useApp();
+  const {
+    currentUser,
+    switchRole,
+    switchUser,
+    users,
+    notifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    resetDemoData,
+    classGroup,
+    logout,
+    setIsSupabaseModalOpen,
+    supabaseHealth,
+  } = useApp();
   const [showNotificationsPopover, setShowNotificationsPopover] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -25,6 +40,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
   const [showEditNameModal, setShowEditNameModal] = useState(false);
   const [showUserProfileModal, setShowUserProfileModal] = useState(false);
   const [showSelfPasswordModal, setShowSelfPasswordModal] = useState(false);
+  const [showPortalLinksModal, setShowPortalLinksModal] = useState(false);
+  const rightActionsRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,19 +50,41 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
         setShowUserDropdown(false);
       }
     };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (rightActionsRef.current && !rightActionsRef.current.contains(e.target as Node)) {
+        setShowNotificationsPopover(false);
+        setShowUserDropdown(false);
+      }
+    };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
+
+  const handleNavClick = (tab: string) => {
+    setShowNotificationsPopover(false);
+    setShowUserDropdown(false);
+    setActiveTab(tab);
+  };
 
   const myNotifications = notifications.filter(
     (n) => n.userId === currentUser.id || n.userId === 'all'
   );
   const unreadCount = myNotifications.filter((n) => !n.isRead).length;
   const memberCount = users.filter((u) => u.role === 'anggota').length;
+  const treasurerInfo = getTreasurerInfo(currentUser);
 
   const roleColors: Record<Role, { bg: string; border: string; label: string; badge: string }> = {
     anggota: { bg: 'bg-emerald-50 text-emerald-700', border: 'border-emerald-200', label: `👦 Anggota (${memberCount})`, badge: 'bg-emerald-600' },
-    bendahara: { bg: 'bg-blue-50 text-blue-700', border: 'border-blue-200', label: '💼 Bendahara', badge: 'bg-[#2563EB]' },
+    bendahara: {
+      bg: treasurerInfo.treasurerNumber === 1 ? 'bg-indigo-50 text-indigo-700' : 'bg-teal-50 text-teal-800',
+      border: treasurerInfo.treasurerNumber === 1 ? 'border-indigo-200' : 'border-teal-200',
+      label: treasurerInfo.treasurerNumber === 1 ? '💼 Bendahara 1 (Maita)' : '💼 Bendahara 2 (Fioren)',
+      badge: treasurerInfo.treasurerNumber === 1 ? 'bg-indigo-600' : 'bg-teal-600',
+    },
     admin: { bg: 'bg-purple-50 text-purple-700', border: 'border-purple-200', label: '👑 Admin', badge: 'bg-purple-600' },
   };
 
@@ -60,15 +99,21 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                 currentUser.role === 'admin'
                   ? 'bg-purple-600'
                   : currentUser.role === 'bendahara'
-                  ? 'bg-[#2563EB]'
+                  ? treasurerInfo.treasurerNumber === 1
+                    ? 'bg-indigo-600 ring-1 ring-indigo-300'
+                    : 'bg-teal-600 ring-1 ring-teal-300'
                   : 'bg-emerald-600'
               }`}
             >
               {currentUser.role === 'admin'
-                ? 'PORTAL ADMINISTRATOR KELAS'
+                ? '👑 PORTAL ADMINISTRATOR KELAS'
                 : currentUser.role === 'bendahara'
-                ? 'PORTAL BENDAHARA KELAS'
-                : 'PORTAL ANGGOTA KELAS'}
+                ? treasurerInfo.treasurerNumber === 1
+                  ? '💼 PORTAL BENDAHARA 1 - MAITA'
+                  : treasurerInfo.treasurerNumber === 2
+                  ? '💼 PORTAL BENDAHARA 2 - FIOREN'
+                  : '💼 PORTAL BENDAHARA KELAS'
+                : '👦 PORTAL ANGGOTA KELAS'}
             </span>
             <span className="text-slate-300 font-bold text-[11px] hidden sm:inline uppercase tracking-wider">
               {currentUser.name} • {classGroup.name}
@@ -77,6 +122,43 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
 
           <div className="flex items-center space-x-1.5">
             <button
+              type="button"
+              onClick={() => setShowPortalLinksModal(true)}
+              className={`px-2.5 py-1 rounded-full text-white font-bold text-[11px] uppercase tracking-wider flex items-center space-x-1 cursor-pointer shadow-xs transition-colors ${
+                currentUser.role === 'anggota'
+                  ? 'bg-emerald-600/90 hover:bg-emerald-500 border border-emerald-400/40'
+                  : currentUser.role === 'bendahara'
+                  ? 'bg-blue-600/90 hover:bg-blue-500 border border-blue-400/40'
+                  : 'bg-purple-600/90 hover:bg-purple-500 border border-purple-400/40'
+              }`}
+              title={
+                currentUser.role === 'anggota'
+                  ? 'Salin Link Khusus Siswa'
+                  : currentUser.role === 'bendahara'
+                  ? 'Salin Link Khusus Bendahara'
+                  : 'Kelola 3 Link Portal (Admin, Bendahara, Siswa)'
+              }
+            >
+              {currentUser.role === 'anggota' ? (
+                <>
+                  <GraduationCap className="w-3 h-3" />
+                  <span>Link Khusus Siswa</span>
+                </>
+              ) : currentUser.role === 'bendahara' ? (
+                <>
+                  <ShieldCheck className="w-3 h-3" />
+                  <span>Link Khusus Bendahara</span>
+                </>
+              ) : (
+                <>
+                  <LinkIcon className="w-3 h-3" />
+                  <span>Kelola 3 Link Portal</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
               onClick={() => setShowPermissionModal(true)}
               className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-amber-200 font-bold text-[11px] uppercase tracking-wider flex items-center space-x-1 border border-amber-400/30 cursor-pointer"
               title="Lihat Perbedaan Hak Akses Role"
@@ -86,6 +168,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
             </button>
 
             <button
+              type="button"
               onClick={logout}
               title="Keluar ke Halaman Login"
               className="ml-1 px-2.5 py-1 rounded-full bg-rose-900/80 hover:bg-rose-800 text-rose-200 font-bold text-[11px] uppercase tracking-wider flex items-center space-x-1 border border-rose-500/30 cursor-pointer"
@@ -99,7 +182,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
         {/* Main Header */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Brand */}
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => handleNavClick('dashboard')}>
             <div className="bg-white text-[#2563EB] font-black px-2.5 py-1 rounded-xl text-lg tracking-tighter shadow-md">
               CF.
             </div>
@@ -119,7 +202,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
           {/* Navigation Tabs (Role Specific) */}
           <nav className="hidden md:flex items-center space-x-1">
             <button
-              onClick={() => setActiveTab('dashboard')}
+              type="button"
+              onClick={() => handleNavClick('dashboard')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === 'dashboard'
                   ? 'bg-white text-[#2563EB] shadow-md'
@@ -136,11 +220,14 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
             {currentUser.role === 'anggota' && (
               <>
                 <button
+                  type="button"
                   onClick={() => {
+                    setShowNotificationsPopover(false);
+                    setShowUserDropdown(false);
                     if (onOpenPayModal) {
                       onOpenPayModal('nominal_1000');
                     } else {
-                      setActiveTab('bayar_1000');
+                      handleNavClick('bayar_1000');
                     }
                   }}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center space-x-1.5 ${
@@ -154,11 +241,14 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                   <span>Bayar Kas Rp 1.000</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
+                    setShowNotificationsPopover(false);
+                    setShowUserDropdown(false);
                     if (onOpenPayModal) {
                       onOpenPayModal('1_minggu');
                     } else {
-                      setActiveTab('bayar');
+                      handleNavClick('bayar');
                     }
                   }}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
@@ -170,7 +260,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                   Bayar Kas (Rp6.000)
                 </button>
                 <button
-                  onClick={() => setActiveTab('riwayat')}
+                  type="button"
+                  onClick={() => handleNavClick('riwayat')}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                     activeTab === 'riwayat'
                       ? 'bg-white text-[#2563EB] shadow-md'
@@ -185,17 +276,19 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
             {(currentUser.role === 'bendahara' || currentUser.role === 'admin') && (
               <>
                 <button
-                  onClick={() => setActiveTab('pembayaran')}
+                  type="button"
+                  onClick={() => handleNavClick('pembayaran')}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                     activeTab === 'pembayaran'
                       ? 'bg-white text-[#2563EB] shadow-md'
                       : 'text-white/90 hover:bg-white/10'
                   }`}
                 >
-                  Status 32 Anggota
+                  Status {memberCount} Anggota
                 </button>
                 <button
-                  onClick={() => setActiveTab('pengeluaran')}
+                  type="button"
+                  onClick={() => handleNavClick('pengeluaran')}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                     activeTab === 'pengeluaran'
                       ? 'bg-white text-[#2563EB] shadow-md'
@@ -208,7 +301,8 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
             )}
 
             <button
-              onClick={() => setActiveTab('laporan')}
+              type="button"
+              onClick={() => handleNavClick('laporan')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                 activeTab === 'laporan'
                   ? 'bg-white text-[#2563EB] shadow-md'
@@ -220,33 +314,47 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
 
             {currentUser.role === 'admin' && (
               <button
-                onClick={() => setActiveTab('admin')}
+                type="button"
+                onClick={() => handleNavClick('admin')}
                 className={`px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                   activeTab === 'admin'
                     ? 'bg-white text-[#2563EB] shadow-md'
                     : 'text-white/90 hover:bg-white/10'
                 }`}
               >
-                Pengaturan Admin
+                Pengaturan Kelas
               </button>
             )}
           </nav>
 
-          {/* Backdrop to close popovers/dropdowns on outside click */}
-          {(showNotificationsPopover || showUserDropdown) && (
-            <div
-              className="fixed inset-0 z-40 bg-transparent cursor-default"
-              onClick={() => {
-                setShowNotificationsPopover(false);
-                setShowUserDropdown(false);
-              }}
-            />
-          )}
-
           {/* Right Actions: QR Code, Notifications, Profile */}
-          <div className="flex items-center space-x-2 relative z-50">
+          <div ref={rightActionsRef} className="flex items-center space-x-2 relative z-50">
+            {/* Supabase Database Button */}
+            <button
+              type="button"
+              onClick={() => setIsSupabaseModalOpen(true)}
+              className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 text-xs font-black uppercase tracking-wider border border-emerald-400/30 transition-all cursor-pointer shadow-xs"
+              title="Status & Pengaturan Database Supabase PostgreSQL"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <Database className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Supabase DB</span>
+            </button>
+
+            {/* Bagikan Link Publik Button */}
+            <button
+              type="button"
+              onClick={() => setShowPortalLinksModal(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-amber-500/20"
+              title="Salin Link Publik yang Bisa Diakses Siapa Saja"
+            >
+              <LinkIcon className="w-3.5 h-3.5 text-slate-950" />
+              <span className="hidden sm:inline">Bagikan Link</span>
+            </button>
+
             {/* Profil Saya Quick Button */}
             <button
+              type="button"
               onClick={() => setShowUserProfileModal(true)}
               className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-black uppercase tracking-wider border border-white/20 transition-all cursor-pointer shadow-xs"
               title="Kelola Foto Profil, Username Akun, & Kontak"
@@ -257,6 +365,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
 
             {/* Member QR Code Button */}
             <button
+              type="button"
               onClick={onOpenQrModal}
               className="p-2 text-white hover:bg-white/15 rounded-xl transition-colors relative cursor-pointer"
               title="Tampilkan QR ID Kas Saya"
@@ -267,7 +376,11 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
             {/* Notifications Trigger */}
             <div className="relative">
               <button
-                onClick={() => setShowNotificationsPopover(!showNotificationsPopover)}
+                type="button"
+                onClick={() => {
+                  setShowUserDropdown(false);
+                  setShowNotificationsPopover(!showNotificationsPopover);
+                }}
                 className="p-2 text-white hover:bg-white/15 rounded-xl transition-colors relative cursor-pointer"
                 title="Notifikasi"
               >
@@ -293,6 +406,7 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                     </div>
                     {unreadCount > 0 && (
                       <button
+                        type="button"
                         onClick={markAllNotificationsRead}
                         className="text-xs text-[#2563EB] hover:underline font-bold cursor-pointer"
                       >
@@ -322,6 +436,12 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                             <span className="text-[10px] text-slate-400 font-bold">{notif.createdAt}</span>
                           </div>
                           <p className="text-slate-600 leading-relaxed">{notif.message}</p>
+                          {notif.senderName && (
+                            <div className="mt-2 flex items-center space-x-1.5 text-[10px] bg-blue-100/80 text-blue-900 px-2 py-1 rounded-lg border border-blue-200 font-bold">
+                              <span>📢 Pengirim:</span>
+                              <span className="font-extrabold">{notif.senderName}</span>
+                            </div>
+                          )}
                         </div>
                       ))
                     )}
@@ -333,7 +453,11 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
             {/* Active Profile Pill */}
             <div className="relative">
               <button
-                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                type="button"
+                onClick={() => {
+                  setShowNotificationsPopover(false);
+                  setShowUserDropdown(!showUserDropdown);
+                }}
                 className="flex items-center space-x-2 p-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/20 cursor-pointer"
               >
                 <div className="relative">
@@ -348,7 +472,9 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                 </div>
                 <div className="text-left hidden lg:block pr-1">
                   <p className="text-xs font-black text-white leading-none">{currentUser.name}</p>
-                  <p className="text-[10px] text-blue-100 font-bold uppercase tracking-wider">{currentUser.role}</p>
+                  <p className="text-[10px] text-blue-100 font-bold uppercase tracking-wider">
+                    {treasurerInfo.isTreasurer ? treasurerInfo.shortLabel : currentUser.role}
+                  </p>
                 </div>
                 <ChevronDown className="w-4 h-4 text-white/80 pr-0.5" />
               </button>
@@ -403,18 +529,46 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                       <span>🔐 Atur & Ubah Sandi Pribadi</span>
                     </button>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowUserDropdown(false);
-                          setShowEditNameModal(true);
-                        }}
-                        className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1 transition-colors cursor-pointer"
-                      >
-                        <Edit3 className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Ganti Nama</span>
-                      </button>
+                    {/* Share Public Links Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        setShowPortalLinksModal(true);
+                      }}
+                      className="w-full py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-950 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-amber-300"
+                    >
+                      <LinkIcon className="w-3.5 h-3.5 text-amber-700" />
+                      <span>🔗 Bagikan Link Publik (Semua Orang)</span>
+                    </button>
+
+                    {/* Supabase Database Action */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        setIsSupabaseModalOpen(true);
+                      }}
+                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-emerald-300 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-emerald-500/30"
+                    >
+                      <Database className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>🗄️ Database Supabase (Cloud SQL)</span>
+                    </button>
+
+                    <div className={currentUser.role === 'admin' ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1'}>
+                      {currentUser.role === 'admin' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowUserDropdown(false);
+                            setShowEditNameModal(true);
+                          }}
+                          className="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1 transition-colors cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-blue-600" />
+                          <span>Ganti Nama</span>
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -425,13 +579,19 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                         className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-black text-[11px] uppercase tracking-wider flex items-center justify-center space-x-1 transition-colors cursor-pointer border border-slate-200"
                       >
                         <Camera className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Ubah Foto</span>
+                        <span>Ubah Foto Profil</span>
                       </button>
                     </div>
 
                     <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-white text-[10px] font-black uppercase tracking-wider ${roleColors[currentUser.role].badge}`}>
-                        ROLE: {currentUser.role.toUpperCase()}
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-white text-[10px] font-black uppercase tracking-wider ${
+                        treasurerInfo.isTreasurer
+                          ? treasurerInfo.treasurerNumber === 1
+                            ? 'bg-indigo-600'
+                            : 'bg-teal-600'
+                          : roleColors[currentUser.role].badge
+                      }`}>
+                        ROLE: {treasurerInfo.isTreasurer ? treasurerInfo.shortLabel.toUpperCase() : currentUser.role.toUpperCase()}
                       </span>
                       <button
                         onClick={() => {
@@ -443,6 +603,29 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
                         Cek Hak Akses
                       </button>
                     </div>
+
+                    {/* Switch to Partner Treasurer if current user is a bendahara */}
+                    {treasurerInfo.isTreasurer && treasurerInfo.partnerUsername && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          const partner = users.find(
+                            (u) =>
+                              u.username === treasurerInfo.partnerUsername ||
+                              (treasurerInfo.partnerRole === 'Bendahara 2' ? u.nisn === '0123428941' : u.nisn === '3124652885')
+                          );
+                          if (partner) {
+                            switchUser(partner.id);
+                          }
+                        }}
+                        className="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-xl font-bold text-[11px] flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-blue-200"
+                        title={`Beralih ke akun ${treasurerInfo.partnerRole} (${treasurerInfo.partnerName})`}
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Beralih ke {treasurerInfo.partnerRole} ({treasurerInfo.callName === 'Maita' ? 'Fioren' : 'Maita'})</span>
+                      </button>
+                    )}
 
                     {/* Logout Button in User Dropdown */}
                     <button
@@ -488,6 +671,12 @@ export const HeaderNav: React.FC<HeaderNavProps> = ({ activeTab, setActiveTab, o
       <SelfPasswordModal
         isOpen={showSelfPasswordModal}
         onClose={() => setShowSelfPasswordModal(false)}
+      />
+
+      <PortalLinksModal
+        isOpen={showPortalLinksModal}
+        onClose={() => setShowPortalLinksModal(false)}
+        filterMode={currentUser.role === 'anggota' ? 'siswa' : currentUser.role === 'bendahara' ? 'pengurus' : 'all'}
       />
     </>
   );

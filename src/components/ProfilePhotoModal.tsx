@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { User } from '../types';
 import { X, Upload, Camera, Image as ImageIcon, Check, Sparkles, RefreshCw, Link as LinkIcon, AlertCircle } from 'lucide-react';
 
 interface ProfilePhotoModalProps {
   isOpen: boolean;
   onClose: () => void;
+  user?: User | null;
 }
 
 const PRESET_AVATARS = [
@@ -28,15 +30,23 @@ const PRESET_AVATARS = [
   'https://api.dicebear.com/7.x/adventurer/svg?seed=aneka',
 ];
 
-export const ProfilePhotoModal: React.FC<ProfilePhotoModalProps> = ({ isOpen, onClose }) => {
+export const ProfilePhotoModal: React.FC<ProfilePhotoModalProps> = ({ isOpen, onClose, user }) => {
   const { currentUser, updateUser } = useApp();
+  const targetUser = user || currentUser;
   const [activeTab, setActiveTab] = useState<'upload' | 'preset' | 'url'>('upload');
-  const [selectedPhoto, setSelectedPhoto] = useState<string>(currentUser.avatar);
+  const [selectedPhoto, setSelectedPhoto] = useState<string>(targetUser.avatar);
   const [customUrlInput, setCustomUrlInput] = useState<string>('');
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [dragOver, setDragOver] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && targetUser) {
+      setSelectedPhoto(targetUser.avatar);
+      setErrorMsg('');
+    }
+  }, [isOpen, targetUser]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -113,7 +123,7 @@ export const ProfilePhotoModal: React.FC<ProfilePhotoModalProps> = ({ isOpen, on
   };
 
   const handleSave = () => {
-    updateUser(currentUser.id, { avatar: selectedPhoto });
+    updateUser(targetUser.id, { avatar: selectedPhoto });
     setIsSuccess(true);
     setTimeout(() => {
       setIsSuccess(false);
@@ -142,7 +152,7 @@ export const ProfilePhotoModal: React.FC<ProfilePhotoModalProps> = ({ isOpen, on
               <span>Ganti Foto Profil</span>
             </h2>
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-              {currentUser.name} • Role: {currentUser.role.toUpperCase()}
+              {targetUser.name} • Role: {targetUser.role.toUpperCase()}
             </p>
           </div>
           <button
@@ -158,7 +168,7 @@ export const ProfilePhotoModal: React.FC<ProfilePhotoModalProps> = ({ isOpen, on
           <div className="relative group">
             <img
               src={selectedPhoto}
-              alt={currentUser.name}
+              alt={targetUser.name}
               className="w-28 h-28 rounded-full object-cover border-4 border-white shadow-xl ring-4 ring-[#2563EB]/20"
               onError={(e) => {
                 // Fallback image on broken URL
@@ -175,7 +185,7 @@ export const ProfilePhotoModal: React.FC<ProfilePhotoModalProps> = ({ isOpen, on
           </div>
 
           <div className="text-center">
-            <p className="font-black text-slate-900 text-sm">{currentUser.name}</p>
+            <p className="font-black text-slate-900 text-sm">{targetUser.name}</p>
             <p className="text-xs text-slate-500 font-medium">Pratinjau Foto Profil Aktif</p>
           </div>
         </div>

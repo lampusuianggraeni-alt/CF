@@ -59,7 +59,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
   const [nisn, setNisn] = useState<string>(currentUser.nisn || '');
   const [phone, setPhone] = useState<string>(currentUser.phone || '');
   const [email, setEmail] = useState<string>(currentUser.email || '');
-  const [googleEmail, setGoogleEmail] = useState<string>(currentUser.googleEmail || currentUser.email || '');
   const [avatar, setAvatar] = useState<string>(currentUser.avatar);
 
   // Photo tab options: 'upload' | 'preset' | 'url'
@@ -208,13 +207,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
     e.preventDefault();
     setErrorMsg(null);
 
-    const cleanName = name.trim();
+    const isAdmin = currentUser.role === 'admin';
+    const cleanName = isAdmin ? name.trim() : currentUser.name;
     const cleanUsername = username.trim().toLowerCase().replace(/\s+/g, '');
-    const cleanNisn = nisn.trim();
+    const cleanNisn = isAdmin ? nisn.trim() : (currentUser.nisn || '');
     const cleanPhone = phone.trim();
     const cleanEmail = email.trim();
 
-    if (!cleanName) {
+    if (isAdmin && !cleanName) {
       setErrorMsg('Nama lengkap tidak boleh kosong.');
       return;
     }
@@ -242,16 +242,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
 
     try {
       updateUser(currentUser.id, {
-        name: cleanName,
+        ...(isAdmin ? { name: cleanName, nisn: cleanNisn } : {}),
         username: cleanUsername,
-        nisn: cleanNisn,
         phone: cleanPhone,
         email: cleanEmail,
-        googleEmail: googleEmail.trim() || cleanEmail,
         avatar: avatar,
       });
 
-      setSuccessToast('Profil berhasil disimpan! Foto, username, & Email Google Anda kini tersinkronisasi.');
+      setSuccessToast('Profil berhasil disimpan! Foto, username, & kontak Anda kini tersinkronisasi.');
       setIsSaving(false);
 
       setTimeout(() => {
@@ -561,7 +559,86 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
+              {/* Field: Nama Lengkap Siswa (Hanya Admin yang bisa ubah) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] flex items-center space-x-1">
+                    <span>Nama Lengkap Siswa</span>
+                    {currentUser.role === 'admin' && <span className="text-rose-500">*</span>}
+                  </label>
+                  {currentUser.role !== 'admin' && (
+                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[9px] font-black uppercase">
+                      <Lock className="w-2.5 h-2.5 text-slate-600" />
+                      <span>Dikunci Admin</span>
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    required
+                    readOnly={currentUser.role !== 'admin'}
+                    disabled={currentUser.role !== 'admin'}
+                    value={name}
+                    onChange={(e) => {
+                      if (currentUser.role === 'admin') setName(e.target.value);
+                    }}
+                    placeholder="Masukkan Nama Lengkap Siswa"
+                    className={`w-full pl-9 pr-3.5 py-2.5 rounded-2xl border text-xs font-bold focus:outline-none ${
+                      currentUser.role === 'admin'
+                        ? 'border-slate-200 text-slate-900 focus:ring-2 focus:ring-[#2563EB] bg-slate-50 focus:bg-white'
+                        : 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed select-none'
+                    }`}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  {currentUser.role === 'admin'
+                    ? 'Sebagai Admin, Anda dapat mengubah nama lengkap ini.'
+                    : 'Nama lengkap resmi hanya dapat diubah oleh Administrator.'}
+                </p>
+              </div>
+
+              {/* Field: NISN Siswa (Hanya Admin yang bisa ubah) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] flex items-center space-x-1">
+                    <span>NISN Siswa</span>
+                    {currentUser.role === 'admin' && <span className="text-rose-500">*</span>}
+                  </label>
+                  {currentUser.role !== 'admin' && (
+                    <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[9px] font-black uppercase">
+                      <Lock className="w-2.5 h-2.5 text-slate-600" />
+                      <span>Dikunci Admin</span>
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    required
+                    readOnly={currentUser.role !== 'admin'}
+                    disabled={currentUser.role !== 'admin'}
+                    value={nisn}
+                    onChange={(e) => {
+                      if (currentUser.role === 'admin') setNisn(e.target.value);
+                    }}
+                    placeholder="contoh: 0061234501"
+                    className={`w-full pl-9 pr-3.5 py-2.5 rounded-2xl border text-xs font-mono font-bold focus:outline-none ${
+                      currentUser.role === 'admin'
+                        ? 'border-slate-200 text-slate-900 focus:ring-2 focus:ring-[#2563EB] bg-slate-50 focus:bg-white'
+                        : 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed select-none'
+                    }`}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  {currentUser.role === 'admin'
+                    ? 'Sebagai Admin, Anda dapat memperbarui NISN ini.'
+                    : 'NISN resmi tidak dapat diubah sendiri (hanya oleh Admin).'}
+                </p>
+              </div>
+
               {/* Field: Username Akun */}
               <div className="space-y-1.5">
                 <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] flex items-center space-x-1">
@@ -582,49 +659,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                   />
                 </div>
                 <p className="text-[10px] text-slate-400">
-                  Digunakan untuk masuk (login) ke akun kas Anda.
-                </p>
-              </div>
-
-              {/* Field: Nama Lengkap */}
-              <div className="space-y-1.5">
-                <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] flex items-center space-x-1">
-                  <span>Nama Lengkap Siswa</span>
-                  <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Nama Lengkap"
-                    className="w-full pl-9 pr-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-[#2563EB] focus:outline-none bg-slate-50 focus:bg-white"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400">
-                  Nama ini tercetak di struk setoran & laporan kas bendahara.
-                </p>
-              </div>
-
-              {/* Field: NISN / ID Anggota */}
-              <div className="space-y-1.5">
-                <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px]">
-                  NISN / ID Anggota
-                </label>
-                <div className="relative">
-                  <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                  <input
-                    type="text"
-                    value={nisn}
-                    onChange={(e) => setNisn(e.target.value)}
-                    placeholder="contoh: 0061234501"
-                    className="w-full pl-9 pr-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:ring-2 focus:ring-[#2563EB] focus:outline-none bg-slate-50 focus:bg-white"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400">
-                  Nomor Induk Siswa Nasional (dapat dipakai untuk login juga).
+                  ID pendek akun di dalam kelas.
                 </p>
               </div>
 
@@ -645,31 +680,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
                 </div>
                 <p className="text-[10px] text-slate-400">
                   Memudahkan Bendahara menghubungi Anda terkait kas.
-                </p>
-              </div>
-
-              {/* Field: Email Google untuk Akses Aplikasi */}
-              <div className="space-y-1.5 sm:col-span-2">
-                <div className="flex items-center justify-between">
-                  <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px]">
-                    Email Google (Wajib untuk Akses Aplikasi)
-                  </label>
-                  <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                    Akun Login Google
-                  </span>
-                </div>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-blue-600 absolute left-3 top-3" />
-                  <input
-                    type="email"
-                    value={googleEmail}
-                    onChange={(e) => setGoogleEmail(e.target.value)}
-                    placeholder="nama.siswa@gmail.com"
-                    className="w-full pl-9 pr-3.5 py-2.5 rounded-2xl border border-blue-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-[#2563EB] focus:outline-none bg-blue-50/30 focus:bg-white"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-500">
-                  Email ini digunakan saat masuk ke aplikasi dan memulihkan kata sandi secara mandiri.
                 </p>
               </div>
             </div>

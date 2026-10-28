@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Mail, Lock, CheckCircle2, AlertCircle, X, Shield, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { CreditCard, Lock, CheckCircle2, AlertCircle, X, Shield, Eye, EyeOff } from 'lucide-react';
 
 interface GoogleResetPasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultEmail?: string;
-  onSuccess: (email: string) => void;
+  onSuccess: (nisn: string) => void;
 }
 
 export const GoogleResetPasswordModal: React.FC<GoogleResetPasswordModalProps> = ({
@@ -15,14 +15,26 @@ export const GoogleResetPasswordModal: React.FC<GoogleResetPasswordModalProps> =
   defaultEmail = '',
   onSuccess,
 }) => {
-  const { resetPasswordWithGoogle, users } = useApp();
-  const [googleEmail, setGoogleEmail] = useState(defaultEmail || '');
+  const { resetPasswordWithGoogle } = useApp();
+  const [nisn, setNisn] = useState(defaultEmail || '');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (defaultEmail) {
+        setNisn(defaultEmail);
+      }
+      setNewPassword('');
+      setConfirmPassword('');
+      setErrorMsg(null);
+      setToastMsg(null);
+    }
+  }, [isOpen, defaultEmail]);
 
   if (!isOpen) return null;
 
@@ -31,11 +43,11 @@ export const GoogleResetPasswordModal: React.FC<GoogleResetPasswordModalProps> =
     setErrorMsg(null);
     setToastMsg(null);
 
-    const cleanEmail = googleEmail.trim().toLowerCase();
+    const cleanNisn = nisn.trim();
     const cleanPass = newPassword.trim();
 
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      setErrorMsg('Harap masukkan alamat Email Google yang valid.');
+    if (!cleanNisn) {
+      setErrorMsg('Harap masukkan NISN yang terdaftar.');
       return;
     }
 
@@ -51,13 +63,13 @@ export const GoogleResetPasswordModal: React.FC<GoogleResetPasswordModalProps> =
 
     setLoading(true);
     setTimeout(() => {
-      const res = resetPasswordWithGoogle(cleanEmail, cleanPass);
+      const res = resetPasswordWithGoogle(cleanNisn, cleanPass);
       setLoading(false);
 
       if (res.success) {
         setToastMsg(res.message);
         setTimeout(() => {
-          onSuccess(cleanEmail);
+          onSuccess(cleanNisn);
           onClose();
         }, 1500);
       } else {
@@ -78,11 +90,11 @@ export const GoogleResetPasswordModal: React.FC<GoogleResetPasswordModalProps> =
         <div className="p-5 bg-linear-to-r from-blue-600 to-indigo-700 text-white flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 bg-white/20 backdrop-blur-md rounded-2xl">
-              <Mail className="w-5 h-5 text-white" />
+              <CreditCard className="w-5 h-5 text-white" />
             </div>
             <div>
               <h2 className="text-base font-black tracking-tight">
-                Atur Ulang Sandi via Email Google
+                Atur Ulang Sandi via NISN
               </h2>
               <p className="text-blue-100 text-[11px] font-medium">
                 Mandiri tanpa perlu menghubungi Admin
@@ -101,10 +113,10 @@ export const GoogleResetPasswordModal: React.FC<GoogleResetPasswordModalProps> =
           <div className="p-3 bg-blue-50 rounded-2xl border border-blue-200 text-xs text-blue-900 space-y-1">
             <p className="font-bold flex items-center space-x-1.5 text-blue-950">
               <Shield className="w-3.5 h-3.5 text-blue-600" />
-              <span>Verifikasi Mandiri Email Google</span>
+              <span>Verifikasi Mandiri NISN</span>
             </p>
             <p className="text-[11px] text-blue-800 leading-relaxed">
-              Masukkan Email Google siswa Anda untuk langsung mengatur kata sandi baru. Sandi Anda dienkripsi secara privat.
+              Masukkan NISN siswa Anda untuk langsung mengatur kata sandi baru. Sandi Anda dienkripsi secara privat.
             </p>
           </div>
 
@@ -125,17 +137,17 @@ export const GoogleResetPasswordModal: React.FC<GoogleResetPasswordModalProps> =
           <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
             <div>
               <label className="block font-bold text-slate-700 mb-1">
-                Email Google (Gmail) Siswa
+                NISN (Nomor Induk Siswa Nasional)
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <CreditCard className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
-                  type="email"
+                  type="text"
                   required
-                  value={googleEmail}
-                  onChange={(e) => setGoogleEmail(e.target.value)}
-                  placeholder="contoh: lampusuianggraeni@gmail.com"
-                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  value={nisn}
+                  onChange={(e) => setNisn(e.target.value)}
+                  placeholder="contoh: 0061234501"
+                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 font-mono font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
             </div>

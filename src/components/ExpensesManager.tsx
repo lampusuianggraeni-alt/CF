@@ -210,6 +210,7 @@ export const ExpensesManager: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setShowInlineAdd(!showInlineAdd)}
             className="px-4 py-3 rounded-2xl bg-blue-50 hover:bg-blue-100 text-[#2563EB] font-bold text-xs flex items-center space-x-1.5 transition-all cursor-pointer border border-blue-200"
           >
@@ -218,6 +219,7 @@ export const ExpensesManager: React.FC = () => {
           </button>
 
           <button
+            type="button"
             onClick={() => setShowAddModal(true)}
             className="px-5 py-3 rounded-2xl bg-[#2563EB] hover:bg-blue-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-blue-200 flex items-center space-x-2 transition-all cursor-pointer"
           >
@@ -428,6 +430,14 @@ export const ExpensesManager: React.FC = () => {
             <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-2" />
             <p className="text-sm font-bold text-slate-700">Belum Ada Pengeluaran</p>
             <p className="text-xs text-slate-400">Klik tombol Tambah Pengeluaran untuk mencatat transaksi baru.</p>
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="mt-3 px-4 py-2 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer inline-flex items-center space-x-1.5 shadow-xs"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>+ Tambah Pengeluaran Kas Sekarang</span>
+            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -456,6 +466,7 @@ export const ExpensesManager: React.FC = () => {
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       {exp.receiptUrl ? (
                         <button
+                          type="button"
                           onClick={() => setViewingReceipt({ url: exp.receiptUrl!, desc: exp.description, amount: exp.amount, date: exp.date })}
                           className="flex items-center space-x-1.5 px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-700 font-bold text-[10px] transition-colors cursor-pointer"
                           title="Lihat Foto Nota Bukti"
@@ -483,6 +494,7 @@ export const ExpensesManager: React.FC = () => {
                       {currentUser.role === 'bendahara' || currentUser.role === 'admin' ? (
                         <div className="flex items-center justify-end space-x-1.5">
                           <button
+                            type="button"
                             onClick={() => openEditModal(exp)}
                             className="px-2.5 py-1.5 rounded-lg bg-blue-50 text-[#2563EB] hover:bg-blue-100 font-bold text-xs flex items-center space-x-1 transition-colors cursor-pointer"
                             title="Ganti / Edit Rincian Pengeluaran"
@@ -492,6 +504,7 @@ export const ExpensesManager: React.FC = () => {
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => openDeleteModal(exp)}
                             className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold text-xs flex items-center space-x-1 transition-colors cursor-pointer"
                             title="Hapus Catatan Pengeluaran Kas"

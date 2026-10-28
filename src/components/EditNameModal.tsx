@@ -12,6 +12,7 @@ interface EditNameModalProps {
 export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onClose }) => {
   const { updateUser, currentUser } = useApp();
   const [name, setName] = useState('');
+  const [nisn, setNisn] = useState('');
   const [role, setRole] = useState<Role>('anggota');
   const [error, setError] = useState('');
   const [isSaved, setIsSaved] = useState(false);
@@ -19,6 +20,7 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
   useEffect(() => {
     if (user) {
       setName(user.name);
+      setNisn(user.nisn || '');
       setRole(user.role);
       setError('');
       setIsSaved(false);
@@ -37,12 +39,19 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
 
   if (!isOpen || !user) return null;
 
+  const isAdmin = currentUser.role === 'admin';
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      setError('Akses Ditolak: Hanya Admin yang dapat mengubah Nama Lengkap dan NISN.');
+      return;
+    }
     const trimmed = name.trim();
+    const trimmedNisn = nisn.trim();
 
     if (!trimmed) {
-      setError('Nama tidak boleh kosong.');
+      setError('Nama lengkap siswa tidak boleh kosong.');
       return;
     }
 
@@ -58,7 +67,8 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
 
     updateUser(user.id, {
       name: trimmed,
-      ...(currentUser.role === 'admin' ? { role } : {}),
+      nisn: trimmedNisn || user.nisn,
+      role,
     });
     setIsSaved(true);
 
@@ -83,11 +93,12 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
               <Edit3 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="font-black text-base uppercase tracking-tight">Ubah Nama Pengguna</h3>
-              <p className="text-xs text-blue-100 font-medium">Perbarui nama tampilan akun kas digital</p>
+              <h3 className="font-black text-base uppercase tracking-tight">Ubah Nama & NISN Siswa</h3>
+              <p className="text-xs text-blue-100 font-medium">Perbarui nama lengkap dan NISN akun siswa</p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-full hover:bg-white/20 text-white/80 hover:text-white transition-colors cursor-pointer"
           >
@@ -96,7 +107,7 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
         </div>
 
         {/* Modal Content */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* User Preview */}
           <div className="flex items-center space-x-3.5 p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
             <img
@@ -111,14 +122,14 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
                 </span>
                 <span className="text-[11px] text-slate-400 font-mono">{user.memberQrCode}</span>
               </div>
-              <p className="text-xs font-bold text-slate-600 truncate mt-0.5">{user.email}</p>
+              <p className="text-xs font-bold text-slate-600 truncate mt-0.5">NISN: {user.nisn || '-'}</p>
             </div>
           </div>
 
           {/* Input Name */}
           <div className="space-y-1.5">
             <label htmlFor="user-name-input" className="block text-xs font-black text-slate-700 uppercase tracking-wider">
-              Nama Baru <span className="text-rose-500">*</span>
+              Nama Lengkap Siswa <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <input
@@ -129,7 +140,7 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
                   setName(e.target.value);
                   if (error) setError('');
                 }}
-                placeholder="Masukkan nama lengkap / panggilan..."
+                placeholder="Masukkan nama lengkap siswa..."
                 autoFocus
                 className={`w-full px-4 py-3 rounded-2xl border text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 transition-all ${
                   error
@@ -148,6 +159,21 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Input NISN */}
+          <div className="space-y-1.5">
+            <label htmlFor="user-nisn-input" className="block text-xs font-black text-slate-700 uppercase tracking-wider">
+              NISN Siswa (Nomor Induk Siswa Nasional)
+            </label>
+            <input
+              id="user-nisn-input"
+              type="text"
+              value={nisn}
+              onChange={(e) => setNisn(e.target.value)}
+              placeholder="Contoh: 0061234501"
+              className="w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50/50 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
+            />
 
             {error && (
               <p className="text-xs text-rose-600 font-bold flex items-center space-x-1 pt-1">
@@ -156,7 +182,7 @@ export const EditNameModal: React.FC<EditNameModalProps> = ({ user, isOpen, onCl
               </p>
             )}
             <p className="text-[11px] text-slate-400 font-medium">
-              Nama ini akan tampil di seluruh kuitansi, riwayat kas, dan daftar kelas.
+              Nama lengkap & NISN ini tampil di kuitansi, riwayat kas, dan daftar kelas.
             </p>
 
             {currentUser.role === 'admin' && (

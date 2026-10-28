@@ -89,6 +89,9 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
   type: 'reminder' | 'payment_success' | 'verification' | 'info';
+  senderName?: string;
+  senderRole?: string;
+  senderId?: string;
 }
 
 export interface AuditLog {
